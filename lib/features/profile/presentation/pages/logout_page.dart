@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-//สำคัญ: อย่าลืมแก้ Path ของหน้า SignInPage ให้ตรงกับโปรเจกต์ของคุณนะครับ
+//สำคัญ: Path ของหน้า SignInPage 
 import 'package:quizcraft/features/auth/presentation/pages/sign_in_page.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LogoutPage extends StatelessWidget {
   const LogoutPage({super.key});
@@ -109,9 +110,17 @@ class LogoutPage extends StatelessWidget {
                     // ปุ่ม CANCEL (สีน้ำเงินเข้ม)
                     Expanded(
                       child: GestureDetector(
-                        onTap: () {
-                          // คำสั่งกดย้อนกลับไปหน้า Profile
-                          Navigator.pop(context);
+                        onTap: () async{
+                          // 1. สั่งเตะผู้ใช้ออกจากระบบ Firebase
+                          await FirebaseAuth.instance.signOut();
+                          // 2. เด้งกลับไปหน้า SignIn และล้างประวัติหน้าจอทั้งหมด
+                          if (context.mounted) {
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(builder: (context) => const SignInPage()),
+                              (Route<dynamic> route) => false,
+                            );
+                          }
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 20),
