@@ -36,7 +36,7 @@ class AnalysisPage extends StatelessWidget {
                   'Analysis',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 40,
+                    fontSize: 36,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'SF-Pro',
                   ),

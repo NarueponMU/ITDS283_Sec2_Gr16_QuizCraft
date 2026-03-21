@@ -38,7 +38,7 @@ class SubjectPage extends StatelessWidget {
                       ),
                     ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
                 // 🔍 SEARCH (เหมือนเดิม)
                 Container(
