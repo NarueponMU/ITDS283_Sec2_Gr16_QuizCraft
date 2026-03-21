@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'ebook_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -30,7 +33,6 @@ class HomePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Header (ข้อความ Home + โปรไฟล์)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -43,11 +45,29 @@ class HomePage extends StatelessWidget {
                         fontFamily: 'SF-Pro',
                       ),
                     ),
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Colors.grey[800],
-                      child: const Icon(Icons.person, color: Colors.white),
+                    
+                    // โค้ดดึงรูปโปรไฟล์มาแสดงที่หน้า Home
+                    StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseAuth.instance.currentUser != null 
+                          ? FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).snapshots()
+                          : null,
+                      builder: (context, snapshot) {
+                        String? photoUrl;
+                        if (snapshot.hasData && snapshot.data!.exists) {
+                          var userData = snapshot.data!.data() as Map<String, dynamic>;
+                          photoUrl = userData['photoUrl']; // ดึงลิงก์รูป
+                        }
+
+                        return CircleAvatar(
+                          radius: 24,
+                          backgroundColor: Colors.grey[800],
+                          // ถ้ามีรูปโชว์รูป ถ้าไม่มีโชว์ไอคอนสีขาว
+                          backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                          child: photoUrl == null ? const Icon(Icons.person, color: Colors.white) : null,
+                        );
+                      },
                     ),
+                    
                   ],
                 ),
                 const SizedBox(height: 24),
