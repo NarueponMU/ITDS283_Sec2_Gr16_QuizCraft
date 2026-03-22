@@ -78,7 +78,7 @@ class SubjectPage extends StatelessWidget {
     );
   }
 
-  // 🔥 ICON เลือกตามวิชา
+  // ICON เลือกตามวิชา
   IconData _getIcon(String title) {
     switch (title) {
       case "Python Programming":
@@ -109,7 +109,7 @@ class SubjectPage extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white, // ✅ พื้นขาว
+          color: Colors.white, // พื้นขาว
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -161,7 +161,7 @@ class SubjectPage extends StatelessWidget {
               ),
             ),
 
-            // 🔹 BUTTON ขวา
+            // BUTTON ขวา
             GestureDetector(
               onTap: () {
                 Navigator.push(

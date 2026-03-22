@@ -37,7 +37,7 @@ class SubjectDetailPage extends StatelessWidget {
             child: ListView(
               children: [
 
-                // 🔥 Title ใหญ่
+                // Title ใหญ่
                 const Text(
                   "Python Programming",
                   style: TextStyle(
@@ -49,7 +49,7 @@ class SubjectDetailPage extends StatelessWidget {
 
                 const SizedBox(height: 8),
 
-                // 🔥 Description
+                // Description
                 const Text(
                   "This course includes basic programming concepts such as variables, loops, conditions, and functions.",
                   style: TextStyle(
@@ -60,7 +60,7 @@ class SubjectDetailPage extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // 🔥 Progress Card
+                // Progress Card
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -96,7 +96,7 @@ class SubjectDetailPage extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // 🔥 Sets
+                // Sets
                 _setItem(context, "Set 1: Variables & Data Types"),
                 _setItem(context, "Set 2: IF-Else"),
                 _setItem(context, "Set 3: Loops"),
@@ -120,7 +120,7 @@ class SubjectDetailPage extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // 🔹 TEXT
+          // TEXT
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,7 +135,7 @@ class SubjectDetailPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
 
-                // 🔥 จำนวนข้อ + เวลา
+                // จำนวนข้อ + เวลา
                 const Text(
                   "10 questions • 5 mins",
                   style: TextStyle(

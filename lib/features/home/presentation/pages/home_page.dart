@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'ebook_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+// ลบ import 'package:quizcraft/features/subject/presentation/pages/subject_page.dart'; ออกได้เลยเพราะเราไม่ได้ใช้กดไปตรงๆ แล้วครับ
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  // 1. เพิ่มตัวรับคำสั่งสลับหน้าจาก MainScreen
+  final VoidCallback? onStartQuiz;
+
+  const HomePage({super.key, this.onStartQuiz});
 
   @override
   Widget build(BuildContext context) {
@@ -111,9 +115,8 @@ class HomePage extends StatelessWidget {
 
                 // 3. Start Quiz Button
                 GestureDetector(
-                  onTap: () {
-                    // TODO: นำทางไปหน้า Subject Page
-                  },
+                  // 2. เปลี่ยนมาใช้คำสั่งที่รับมาจาก MainScreen เพื่อสั่งสลับแท็บ
+                  onTap: onStartQuiz,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       vertical: 24,

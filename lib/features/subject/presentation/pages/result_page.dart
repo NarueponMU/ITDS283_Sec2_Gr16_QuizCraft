@@ -37,7 +37,7 @@ class ResultPage extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // 🔥 ICON
+                // ICON
                 const Icon(
                   Icons.star,
                   size: 80,
@@ -46,11 +46,11 @@ class ResultPage extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // 🔥 TITLE
+                // TITLE
                 const Text(
                   "Congratulations!",
                   style: TextStyle(
-                    fontSize: 24, // 🔥 ปรับแล้ว
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -58,19 +58,19 @@ class ResultPage extends StatelessWidget {
 
                 const SizedBox(height: 8),
 
-                // 🔥 DESCRIPTION
+                // DESCRIPTION
                 const Text(
                   "You have successfully completed the quiz.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 16, // 🔥 ปรับแล้ว
+                    fontSize: 16,
                   ),
                 ),
 
                 const SizedBox(height: 24),
 
-                // 🔥 SCORE CARD
+                // SCORE CARD
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -83,7 +83,7 @@ class ResultPage extends StatelessWidget {
                       Text(
                         "Score: 8 / 10",
                         style: TextStyle(
-                          fontSize: 32, // 🔥 เด่นขึ้น
+                          fontSize: 32,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -100,7 +100,7 @@ class ResultPage extends StatelessWidget {
 
                 const SizedBox(height: 24),
 
-                // 🔥 BUTTON 1
+                // BUTTON 1
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -122,7 +122,7 @@ class ResultPage extends StatelessWidget {
 
                 const SizedBox(height: 12),
 
-                // 🔥 BUTTON 2
+                // BUTTON 2
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -152,7 +152,7 @@ class ResultPage extends StatelessWidget {
   }
 }
 
-// 🔥 ROW ITEM
+// ROW ITEM
 class _RowItem extends StatelessWidget {
   final String title;
   final String value;
@@ -170,14 +170,14 @@ class _RowItem extends StatelessWidget {
             title,
             style: const TextStyle(
               color: Colors.black54,
-              fontSize: 15, // 🔥 ปรับแล้ว
+              fontSize: 15,
             ),
           ),
           Text(
             value,
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 16, // 🔥 ปรับแล้ว
+              fontSize: 16,
             ),
           ),
         ],

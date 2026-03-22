@@ -53,7 +53,7 @@ class _QuizPageState extends State<QuizPage> {
 
                 const SizedBox(height: 20),
 
-                // 🔥 RESULT BOX
+                // RESULT BOX
                 if (answered)
                   Center(
                     child: Container(
@@ -86,7 +86,7 @@ class _QuizPageState extends State<QuizPage> {
 
                 const Spacer(),
 
-                // 🔥 NEXT BUTTON (ยาวเต็ม + ฟ้าเข้ม)
+                // NEXT BUTTON (ยาวเต็ม + ฟ้าเข้ม)
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -134,7 +134,7 @@ class _QuizPageState extends State<QuizPage> {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.black, width: 1.5),
 
-          // 🔥 shadow ให้ดู soft
+          // shadow ให้ดู soft
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
@@ -160,7 +160,7 @@ class _QuizPageState extends State<QuizPage> {
 
   Color _getColor(int index) {
     if (!answered) {
-      // 🔥 ฟ้าอ่อน
+      // ฟ้าอ่อน
       return Colors.white.withOpacity(0.55);
     }
 
