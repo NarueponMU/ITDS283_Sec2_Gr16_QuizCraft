@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // 🔴 Import Firestore
 import 'subject_detail_page.dart';
 
 class SubjectPage extends StatelessWidget {
@@ -29,14 +30,14 @@ class SubjectPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                      'Subject',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'SF-Pro',
-                      ),
-                    ),
+                  'Subject',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'SF-Pro',
+                  ),
+                ),
 
                 const SizedBox(height: 24),
 
@@ -60,14 +61,43 @@ class SubjectPage extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
+                // 🔴 ใช้ StreamBuilder เพื่อดึงข้อมูลจาก Firebase มาแสดงแบบ Real-time
                 Expanded(
-                  child: ListView(
-                    children: [
-                      _subjectItem(context, "Python Programming"),
-                      _subjectItem(context, "Discrete Math"),
-                      _subjectItem(context, "Software Engineer"),
-                      _subjectItem(context, "Network Basic"),
-                    ],
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance.collection('subjects').snapshots(),
+                    builder: (context, snapshot) {
+                      // ถ้ากำลังโหลดข้อมูล
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator(color: Colors.white));
+                      }
+                      
+                      // ถ้าเกิดข้อผิดพลาด
+                      if (snapshot.hasError) {
+                        return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล', style: TextStyle(color: Colors.white)));
+                      }
+
+                      // ถ้าไม่มีข้อมูลเลย
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return const Center(child: Text('ไม่พบรายวิชา', style: TextStyle(color: Colors.white, fontSize: 18)));
+                      }
+
+                      // ดึงรายการข้อมูล (Documents) มาใส่ในตัวแปร
+                      final subjects = snapshot.data!.docs;
+
+                      return ListView.builder(
+                        itemCount: subjects.length,
+                        itemBuilder: (context, index) {
+                          // ดึงข้อมูลแต่ละวิชาออกมา
+                          var subjectData = subjects[index].data() as Map<String, dynamic>;
+                          String id = subjects[index].id;
+                          String code = subjectData['code'] ?? '';
+                          String name = subjectData['name'] ?? 'Unknown Subject';
+                          String difficulty = subjectData['difficulty'] ?? 'Medium';
+
+                          return _subjectItem(context, id, code, name, difficulty);
+                        },
+                      );
+                    },
                   ),
                 ),
               ],
@@ -78,30 +108,50 @@ class SubjectPage extends StatelessWidget {
     );
   }
 
-  // ICON เลือกตามวิชา
-  IconData _getIcon(String title) {
-    switch (title) {
-      case "Python Programming":
+  // 🔴 ฟังก์ชันเลือก ICON ตามรหัสวิชา (Code)
+  IconData _getIcon(String code) {
+    switch (code) {
+      case "ITDS120": // Programming
         return Icons.computer;
-      case "Discrete Math":
+      case "ITDS124": // Math
         return Icons.functions;
-      case "Software Engineer":
-        return Icons.build;
-      case "Network Basic":
+      case "ITDS191": // Ethics
+        return Icons.balance; // รูปตราชั่งความยุติธรรม
+      case "ITDS231": // Network
         return Icons.wifi;
+      case "ITDS261": // Software Eng
+        return Icons.developer_mode;
+      case "ITDS271": // Security
+        return Icons.security;
       default:
         return Icons.book;
     }
   }
 
-  Widget _subjectItem(BuildContext context, String title) {
+  // 🔴 ปรับ _subjectItem ให้รับข้อมูลจาก Firebase
+  Widget _subjectItem(BuildContext context, String id, String code, String name, String difficulty) {
+    
+    // ตั้งค่าสีตัวหนังสือระดับความยาก
+    Color diffColor;
+    if (difficulty == 'Hard') {
+      diffColor = Colors.red;
+    } else if (difficulty == 'Medium') {
+      diffColor = Colors.orange;
+    } else {
+      diffColor = Colors.green;
+    }
+
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: () {
+        // 🔴 ตอนนี้ส่งแค่ชื่อวิชาไปก่อน (เดี๋ยวเราค่อยไปปรับ SubjectDetailPage ให้รับ ID วิชาด้วย)
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => SubjectDetailPage(title: title),
+            builder: (_) => SubjectDetailPage(
+              subjectId: id, //เพิ่มการส่ง id ไปด้วย
+              title: name,
+            ), 
           ),
         );
       },
@@ -109,7 +159,7 @@ class SubjectPage extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white, // พื้นขาว
+          color: Colors.white, 
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -129,7 +179,7 @@ class SubjectPage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                _getIcon(title),
+                _getIcon(code),
                 size: 30,
                 color: Colors.black,
               ),
@@ -143,17 +193,19 @@ class SubjectPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
+                    name,
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 16, // ปรับเล็กลงนิดนึง เผื่อชื่อวิชายาว
                       fontWeight: FontWeight.bold,
                     ),
+                    maxLines: 2, //  บังคับให้ชื่อวิชาขึ้นบรรทัดใหม่ได้สูงสุด 2 บรรทัด
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    "Hard",
+                  Text(
+                    difficulty,
                     style: TextStyle(
-                      color: Colors.red,
+                      color: diffColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -167,7 +219,10 @@ class SubjectPage extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => SubjectDetailPage(title: title),
+                    builder: (_) => SubjectDetailPage(
+                      subjectId: id, //เพิ่มการส่ง id ไปด้วย
+                      title: name,
+                    ),
                   ),
                 );
               },
