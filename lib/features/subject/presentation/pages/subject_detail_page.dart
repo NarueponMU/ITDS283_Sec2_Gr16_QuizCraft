@@ -1,12 +1,77 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // 🔴 Import Firestore
+import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:firebase_auth/firebase_auth.dart'; 
 import 'quiz_page.dart';
 
 class SubjectDetailPage extends StatelessWidget {
-  final String subjectId; // 🔴 เพิ่มตัวรับ ID ของวิชา
+  final String subjectId; 
   final String title;
 
   const SubjectDetailPage({super.key, required this.subjectId, required this.title});
+
+  // ฟังก์ชันสำหรับรีเซ็ตความคืบหน้า
+  Future<void> _resetProgress(BuildContext context) async {
+    bool confirm = await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Reset Progress", style: TextStyle(fontFamily: 'SF-Pro', fontWeight: FontWeight.bold)),
+        content: const Text("คุณต้องการล้างความคืบหน้าและคะแนนของวิชานี้ทั้งหมด เพื่อเริ่มทำใหม่ใช่หรือไม่?", style: TextStyle(fontFamily: 'SF-Pro')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false), 
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontFamily: 'SF-Pro'))
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Reset", style: TextStyle(color: Colors.white, fontFamily: 'SF-Pro', fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!confirm) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final scoresRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('scores');
+
+    try {
+      final snapshot = await scoresRef.get();
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (var doc in snapshot.docs) {
+        if (doc.id.startsWith('${subjectId}_')) {
+          batch.delete(doc.reference);
+        }
+      }
+
+      await batch.commit();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("รีเซ็ตความคืบหน้าเรียบร้อยแล้ว 🔄", style: TextStyle(fontFamily: 'SF-Pro')),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("เกิดข้อผิดพลาด: $e")),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,18 +92,30 @@ class SubjectDetailPage extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
+          centerTitle: true, // 🔴 บังคับให้อยู่ตรงกลางเสมอ
           iconTheme: const IconThemeData(color: Colors.white),
-          title: Text(
-            title,
-            style: const TextStyle(color: Colors.white, fontFamily: 'SF-Pro'),
+          // 🔴 ใส่ FittedBox ครอบ Text เพื่อให้มันย่อขนาดตัวเองอัตโนมัติถ้าชื่อวิชายาวไป
+          title: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              title,
+              style: const TextStyle(color: Colors.white, fontFamily: 'SF-Pro', fontSize: 20, fontWeight: FontWeight.w600),
+            ),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+              tooltip: 'Reset Progress',
+              onPressed: () => _resetProgress(context), 
+            ),
+          ],
         ),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: ListView(
               children: [
-                // Title ใหญ่ (ใช้ชื่อวิชาที่รับมา)
+                // Title ใหญ่ 
                 Text(
                   title,
                   style: const TextStyle(
@@ -51,7 +128,7 @@ class SubjectDetailPage extends StatelessWidget {
 
                 const SizedBox(height: 8),
 
-                // Description (ปรับให้เป็นข้อความกว้างๆ ที่ใช้ได้ทุกวิชา)
+                // Description 
                 Text(
                   "Practice platform for $title. Complete all sets to master the subject.",
                   style: const TextStyle(
@@ -63,52 +140,81 @@ class SubjectDetailPage extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // Progress Card (จำลองไว้ก่อน เดี๋ยวเราค่อยมาทำระบบคำนวณของจริงทีหลัง)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Your Progress",
-                        style: TextStyle(
-                          color: Colors.black54,
-                          fontFamily: 'SF-Pro',
-                        ),
+                // Progress Card (เชื่อม Firebase ของจริง)
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseAuth.instance.currentUser != null
+                      ? FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(FirebaseAuth.instance.currentUser!.uid)
+                          .collection('scores')
+                          .snapshots()
+                      : null,
+                  builder: (context, snapshot) {
+                    int completedSets = 0;
+                    int sumBestScores = 0;
+
+                    if (snapshot.hasData) {
+                      for (var doc in snapshot.data!.docs) {
+                        if (doc.id.startsWith('${subjectId}_')) {
+                          completedSets++;
+                          var data = doc.data() as Map<String, dynamic>;
+                          sumBestScores += (data['bestScore'] ?? 0) as int;
+                        }
+                      }
+                    }
+
+                    double bestScorePercent = 0;
+                    if (completedSets > 0) {
+                      bestScorePercent = (sumBestScores / (completedSets * 20.0)) * 100;
+                    }
+
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      SizedBox(height: 6),
-                      Text(
-                        "Complete 0/4 sets",
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'SF-Pro',
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Your Progress",
+                            style: TextStyle(
+                              color: Colors.black54,
+                              fontFamily: 'SF-Pro',
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "Complete $completedSets/4 sets",
+                            style: const TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'SF-Pro',
+                            ),
+                          ),
+                          Text(
+                            "Overall Score : ${bestScorePercent.toStringAsFixed(0)} %",
+                            style: const TextStyle(
+                              color: Colors.green,
+                              fontFamily: 'SF-Pro',
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        "Best Score : 0 %",
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontFamily: 'SF-Pro',
-                        ),
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 20),
 
-                // 🔴 ดึงชุดข้อสอบ (Sets) จาก Firebase
+                // ดึงชุดข้อสอบ (Sets) จาก Firebase
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('subjects')
                       .doc(subjectId)
                       .collection('sets')
-                      .orderBy('id') // เรียงลำดับจาก set1, set2...
+                      .orderBy('id') 
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
@@ -124,10 +230,8 @@ class SubjectDetailPage extends StatelessWidget {
                       return const Center(child: Text("ยังไม่มีชุดข้อสอบสำหรับวิชานี้", style: TextStyle(color: Colors.white)));
                     }
 
-                    // ดึงข้อมูล Sets ออกมาเป็น List
                     var sets = snapshot.data!.docs;
 
-                    // ใช้ ListView.builder ซ้อนใน ListView ต้องใส่ shrinkWrap และ NeverScrollableScrollPhysics
                     return ListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -139,7 +243,6 @@ class SubjectDetailPage extends StatelessWidget {
                         int timeLimit = setData['timeLimitMins'] ?? 0;
                         String setId = sets[index].id;
 
-                        // โยนข้อมูลให้ Widget สร้างกล่อง
                         return _setItem(context, setName, qCount, timeLimit, setId);
                       },
                     );
@@ -153,7 +256,6 @@ class SubjectDetailPage extends StatelessWidget {
     );
   }
 
-  // 🔴 ปรับ _setItem ให้รับจำนวนข้อและเวลามาโชว์ด้วย
   Widget _setItem(BuildContext context, String title, int qCount, int time, String setId) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -164,7 +266,6 @@ class SubjectDetailPage extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // TEXT
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,8 +280,6 @@ class SubjectDetailPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-
-                // จำนวนข้อ + เวลา
                 Text(
                   "$qCount questions • $time mins",
                   style: const TextStyle(
@@ -191,8 +290,6 @@ class SubjectDetailPage extends StatelessWidget {
               ],
             ),
           ),
-
-          // 🔹 BUTTON
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black87,
@@ -202,12 +299,11 @@ class SubjectDetailPage extends StatelessWidget {
               ),
             ),
             onPressed: () {
-              // TODO: เดี๋ยวเราจะส่ง subjectId และ setId ไปให้หน้า QuizPage ต่อไป
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => QuizPage(
-                  subjectId: subjectId, // ส่ง ID วิชาไป
-                  setId: setId,         // ส่ง ID ชุดข้อสอบไป
+                  subjectId: subjectId, 
+                  setId: setId,         
                 )),
               );
             },
