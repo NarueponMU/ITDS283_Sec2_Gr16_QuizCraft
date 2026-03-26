@@ -35,8 +35,7 @@ class _QuizPageState extends State<QuizPage> {
           .doc(widget.subjectId)
           .collection('sets')
           .doc(widget.setId)
-          .collection("questions")
-            .orderBy("questionText", descending: false)
+          .collection('questions')
           .get();
 
       if (mounted) {
