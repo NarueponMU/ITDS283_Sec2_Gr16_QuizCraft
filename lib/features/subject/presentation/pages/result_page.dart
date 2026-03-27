@@ -8,6 +8,7 @@ class ResultPage extends StatefulWidget {
   final int totalQuestions;
   final String subjectId;
   final String setId;
+  final int timeSpent; // 🌟 รับเวลาที่ใช้ทำข้อสอบมาจากหน้า Quiz
 
   const ResultPage({
     super.key,
@@ -15,6 +16,7 @@ class ResultPage extends StatefulWidget {
     required this.totalQuestions,
     required this.subjectId,
     required this.setId,
+    required this.timeSpent, // 🌟 เพิ่มมารับค่า
   });
 
   @override
@@ -31,29 +33,37 @@ class _ResultPageState extends State<ResultPage> {
     _saveAndFetchBestScore();
   }
 
-  // 🔴 ฟังก์ชันบันทึกคะแนน ดึงคะแนนสูงสุด และเก็บประวัติการทำข้อสอบ
+  // แปลงวินาทีเป็น MM:SS สำหรับแสดงผล
+  String _formatTime(int seconds) {
+    int minutes = seconds ~/ 60;
+    int remainingSeconds = seconds % 60;
+    String minsStr = minutes.toString().padLeft(2, '0');
+    String secsStr = remainingSeconds.toString().padLeft(2, '0');
+    return "$minsStr:$secsStr";
+  }
+
   Future<void> _saveAndFetchBestScore() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     try {
-      // 🌟 1. ส่วนที่เพิ่มใหม่: บันทึกประวัติการทำข้อสอบ (Attempt History)
-      // สร้าง Document ใหม่ทุกครั้งที่ทำข้อสอบเสร็จ
+      // 🌟 1. บันทึกประวัติการทำข้อสอบ (เพิ่มเวลาที่ใช้เข้าไปด้วย!)
       final historyRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .collection('history') // สร้าง Subcollection ใหม่ชื่อ history
-          .doc(); // ปล่อยว่างไว้ให้ Firebase สร้าง ID สุ่มให้ (จะได้ไม่ทับของเดิม)
+          .collection('history') 
+          .doc(); 
 
       await historyRef.set({
         'subjectId': widget.subjectId,
         'setId': widget.setId,
         'score': widget.score,
         'totalQuestions': widget.totalQuestions,
-        'timestamp': FieldValue.serverTimestamp(), // ประทับเวลาจริง
+        'timeSpent': widget.timeSpent, // 🔴 บันทึกวินาทีที่ใช้ ลง Firebase
+        'timestamp': FieldValue.serverTimestamp(), 
       });
 
-      // 🌟 2. ส่วนของ Best Score (เก็บทับแบบเดิม เพื่อใช้ในหน้าวิชา)
+      // 🌟 2. อัปเดต Best Score ของชุดข้อสอบนี้
       final docRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -67,7 +77,6 @@ class _ResultPageState extends State<ResultPage> {
         currentBest = docSnap.data()?['bestScore'] ?? 0;
       }
 
-      // ถ้าคะแนนรอบนี้มากกว่าคะแนนสูงสุดเดิม ให้บันทึกทับ
       if (widget.score > currentBest) {
         currentBest = widget.score;
         await docRef.set({
@@ -83,15 +92,12 @@ class _ResultPageState extends State<ResultPage> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // คำนวณเปอร์เซ็นต์เพื่อเช็คว่าผ่านไหม
     double percentage = widget.totalQuestions == 0 ? 0 : (widget.score / widget.totalQuestions) * 100;
     bool isPassed = percentage >= 50;
 
@@ -119,25 +125,17 @@ class _ResultPageState extends State<ResultPage> {
                   child: Column(
                     children: [
                       const SizedBox(height: 20),
-
-                      // ICON (ถ้าผ่านเป็นดาวเขียว/ทอง ถ้าตกเป็นสีแดง)
                       Icon(
                         isPassed ? Icons.star : Icons.sentiment_dissatisfied,
                         size: 80,
                         color: isPassed ? Colors.amberAccent : Colors.redAccent,
                       ),
-
                       const SizedBox(height: 20),
-
-                      // TITLE
                       Text(
                         isPassed ? "Congratulations!" : "Keep Trying!",
                         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'SF-Pro'),
                       ),
-
                       const SizedBox(height: 8),
-
-                      // DESCRIPTION
                       Text(
                         isPassed 
                             ? "You have successfully completed the quiz."
@@ -145,7 +143,6 @@ class _ResultPageState extends State<ResultPage> {
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Colors.white70, fontSize: 16, fontFamily: 'SF-Pro'),
                       ),
-
                       const SizedBox(height: 24),
 
                       // SCORE CARD
@@ -165,15 +162,16 @@ class _ResultPageState extends State<ResultPage> {
                             
                             _RowItem("Correct Answers", "${widget.score}"),
                             _RowItem("Incorrect Answers", "${widget.totalQuestions - widget.score}"),
-                            const _RowItem("Time Used", "-"), 
+                            
+                            // 🌟 แสดงเวลาที่ใช้จริง
+                            _RowItem("Time Used", _formatTime(widget.timeSpent)), 
+                            
                             _RowItem("Best Score", "$bestScore/${widget.totalQuestions}"),
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 24),
 
-                      // BUTTON 1: Retry Quiz
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -195,10 +193,7 @@ class _ResultPageState extends State<ResultPage> {
                           child: const Text("Retry Quiz", style: TextStyle(fontSize: 17, fontFamily: 'SF-Pro')),
                         ),
                       ),
-
                       const SizedBox(height: 12),
-
-                      // BUTTON 2: Back to Course
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -223,7 +218,6 @@ class _ResultPageState extends State<ResultPage> {
   }
 }
 
-// ROW ITEM
 class _RowItem extends StatelessWidget {
   final String title;
   final String value;

@@ -9,14 +9,14 @@ class SubjectDetailPage extends StatelessWidget {
 
   const SubjectDetailPage({super.key, required this.subjectId, required this.title});
 
-  // ฟังก์ชันสำหรับรีเซ็ตความคืบหน้า
+  // ฟังก์ชันสำหรับรีเซ็ตความคืบหน้า (แบบ Hard Reset ล้างยันประวัติ)
   Future<void> _resetProgress(BuildContext context) async {
     bool confirm = await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text("Reset Progress", style: TextStyle(fontFamily: 'SF-Pro', fontWeight: FontWeight.bold)),
-        content: const Text("คุณต้องการล้างความคืบหน้าและคะแนนของวิชานี้ทั้งหมด เพื่อเริ่มทำใหม่ใช่หรือไม่?", style: TextStyle(fontFamily: 'SF-Pro')),
+        content: const Text("Do you want to reset all progress and history for this subject to start over 100%?", style: TextStyle(fontFamily: 'SF-Pro')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false), 
@@ -39,27 +39,33 @@ class SubjectDetailPage extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final scoresRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('scores');
+    final db = FirebaseFirestore.instance;
+    final batch = db.batch(); // ใช้ Batch เพื่อสั่งลบทีเดียวพร้อมกัน
 
     try {
-      final snapshot = await scoresRef.get();
-      final batch = FirebaseFirestore.instance.batch();
-
-      for (var doc in snapshot.docs) {
-        if (doc.id.startsWith('${subjectId}_')) {
+      // 🌟 1. ตามลบข้อมูลคะแนน (Scores)
+      final scoresRef = db.collection('users').doc(user.uid).collection('scores');
+      final scoresSnap = await scoresRef.get();
+      for (var doc in scoresSnap.docs) {
+        if (doc.id.startsWith('${subjectId}_')) { // ลบเฉพาะวิชานี้
           batch.delete(doc.reference);
         }
       }
 
+      // 🌟 2. ตามลบข้อมูลประวัติ (History) ที่ทำให้กราฟใน Analysis ค้าง
+      final historyRef = db.collection('users').doc(user.uid).collection('history');
+      final historySnap = await historyRef.where('subjectId', isEqualTo: subjectId).get();
+      for (var doc in historySnap.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // สั่งประหาร! (ลบทั้งหมดในรวดเดียว)
       await batch.commit();
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("รีเซ็ตความคืบหน้าเรียบร้อยแล้ว 🔄", style: TextStyle(fontFamily: 'SF-Pro')),
+            content: Text("This course data has been successfully cleared.", style: TextStyle(fontFamily: 'SF-Pro')),
             backgroundColor: Colors.green,
           ),
         );
@@ -67,7 +73,7 @@ class SubjectDetailPage extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("เกิดข้อผิดพลาด: $e")),
+          SnackBar(content: Text("An error occurred: $e")),
         );
       }
     }
@@ -92,9 +98,9 @@ class SubjectDetailPage extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          centerTitle: true, // 🔴 บังคับให้อยู่ตรงกลางเสมอ
+          centerTitle: true, //บังคับให้อยู่ตรงกลางเสมอ
           iconTheme: const IconThemeData(color: Colors.white),
-          // 🔴 ใส่ FittedBox ครอบ Text เพื่อให้มันย่อขนาดตัวเองอัตโนมัติถ้าชื่อวิชายาวไป
+          //ใส่ FittedBox ครอบ Text เพื่อให้มันย่อขนาดตัวเองอัตโนมัติถ้าชื่อวิชายาวไป
           title: FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
@@ -224,10 +230,10 @@ class SubjectDetailPage extends StatelessWidget {
                       ));
                     }
                     if (snapshot.hasError) {
-                      return const Center(child: Text("เกิดข้อผิดพลาดในการโหลดข้อสอบ", style: TextStyle(color: Colors.white)));
+                      return const Center(child: Text("An error occurred while loading the exam.", style: TextStyle(color: Colors.white)));
                     }
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return const Center(child: Text("ยังไม่มีชุดข้อสอบสำหรับวิชานี้", style: TextStyle(color: Colors.white)));
+                      return const Center(child: Text("No exam sets available for this subject.", style: TextStyle(color: Colors.white)));
                     }
 
                     var sets = snapshot.data!.docs;

@@ -111,9 +111,15 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
       }
     }
 
+    // 🔴 ท่อนที่เพิ่มเข้าไปเพื่อแก้ปัญหากราฟล่องหน
     if (totalAttempts == 0) {
       scoreSpots = [const FlSpot(0, 0), const FlSpot(1, 0)];
       avgSpots = [const FlSpot(0, 0), const FlSpot(1, 0)];
+    } else if (totalAttempts == 1) {
+      // 🌟 ถ้าทำข้อสอบไปแค่ 1 ครั้ง ให้ก๊อปปี้จุดเดิมเพิ่มไปอีกจุด
+      // เพื่อให้กราฟมี 2 จุดสำหรับลากเป็นเส้นตรง (ไม่งั้นมันจะไม่วาดเส้นให้)
+      scoreSpots.add(FlSpot(1, scoreSpots[0].y));
+      avgSpots.add(FlSpot(1, avgSpots[0].y));
     }
 
     double avgScore = totalAttempts > 0 ? sumPercent / totalAttempts : 0.0;
@@ -293,23 +299,23 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 🔴 4.1 Grid 2x2 Stat Cards (ดีไซน์ใหม่)
+                          // 4.1 Grid 2x2 Stat Cards
                           Row(
                             children: [
-                              Expanded(child: _buildStatCard('Total\nAttempts', '$totalAttempts', '', Icons.replay_circle_filled_rounded, const Color(0xFFF96D52))), // สีส้มแดง
+                              Expanded(child: _buildStatCard('Total\nAttempts', '$totalAttempts', '', Icons.replay_circle_filled_rounded, const Color(0xFFF96D52))), 
                               const SizedBox(width: 16),
-                              Expanded(child: _buildStatCard('Average\nScore', avgScore, ' %', Icons.analytics_rounded, const Color(0xFF8F70FF))), // สีม่วง
+                              Expanded(child: _buildStatCard('Average\nScore', avgScore, ' %', Icons.analytics_rounded, const Color(0xFF8F70FF))), 
                             ],
                           ),
                           const SizedBox(height: 16),
                           Row(
                             children: [
-                              Expanded(child: _buildStatCard('Best\nScore', bestScore, ' %', Icons.emoji_events_rounded, const Color(0xFFFF9500))), // สีเหลืองทอง
+                              Expanded(child: _buildStatCard('Best\nScore', bestScore, ' %', Icons.emoji_events_rounded, const Color(0xFFFF9500))), 
                               const SizedBox(width: 16),
-                              Expanded(child: _buildStatCard('Completion\nRate', completionRate, ' %', Icons.check_circle_rounded, const Color(0xFF1ED6B4))), // สีเขียวมิ้นต์
+                              Expanded(child: _buildStatCard('Completion\nRate', completionRate, ' %', Icons.check_circle_rounded, const Color(0xFF1ED6B4))), 
                             ],
                           ),
-                          const SizedBox(height: 24), // เพิ่มระยะห่างนิดนึงให้หายใจสะดวกขึ้น
+                          const SizedBox(height: 24), 
 
                           // 4.2 Course Process Section 
                           const Text('Course Process', style: TextStyle(color: Color(0xFFFF9500), fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
@@ -400,7 +406,6 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
     );
   }
 
-  // 🔴 Widget สร้าง Stat Card ฉบับอัปเกรด (สีขาว, มีขอบ, มีไอคอนสีสวยๆ)
   Widget _buildStatCard(String title, String value, String unit, IconData icon, Color accentColor) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -409,7 +414,7 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withOpacity(0.1), // เงาบางๆ เป็นสีเดียวกับ Theme
+            color: accentColor.withOpacity(0.1), 
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -420,7 +425,6 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // แถวบน: ไอคอน + ชื่อหัวข้อ
           Row(
             children: [
               Container(
@@ -448,7 +452,6 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
             ],
           ),
           const SizedBox(height: 16),
-          // แถวล่าง: ตัวเลข + หน่วย
           Align(
             alignment: Alignment.bottomRight,
             child: Row(
@@ -462,7 +465,7 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                     fontSize: 26, 
                     fontWeight: FontWeight.w900, 
                     fontFamily: 'SF-Pro',
-                    color: accentColor, // สีตัวเลขดึงดูดสายตา
+                    color: accentColor, 
                   )
                 ),
                 if (unit.isNotEmpty)
