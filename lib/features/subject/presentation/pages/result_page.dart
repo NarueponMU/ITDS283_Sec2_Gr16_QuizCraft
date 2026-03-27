@@ -31,19 +31,35 @@ class _ResultPageState extends State<ResultPage> {
     _saveAndFetchBestScore();
   }
 
-  // 🔴 ฟังก์ชันบันทึกคะแนนและดึงคะแนนสูงสุดจาก Firebase
+  // 🔴 ฟังก์ชันบันทึกคะแนน ดึงคะแนนสูงสุด และเก็บประวัติการทำข้อสอบ
   Future<void> _saveAndFetchBestScore() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // สร้างที่เก็บคะแนนของวิชาและชุดข้อสอบนี้
-    final docRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('scores')
-        .doc('${widget.subjectId}_${widget.setId}');
-
     try {
+      // 🌟 1. ส่วนที่เพิ่มใหม่: บันทึกประวัติการทำข้อสอบ (Attempt History)
+      // สร้าง Document ใหม่ทุกครั้งที่ทำข้อสอบเสร็จ
+      final historyRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('history') // สร้าง Subcollection ใหม่ชื่อ history
+          .doc(); // ปล่อยว่างไว้ให้ Firebase สร้าง ID สุ่มให้ (จะได้ไม่ทับของเดิม)
+
+      await historyRef.set({
+        'subjectId': widget.subjectId,
+        'setId': widget.setId,
+        'score': widget.score,
+        'totalQuestions': widget.totalQuestions,
+        'timestamp': FieldValue.serverTimestamp(), // ประทับเวลาจริง
+      });
+
+      // 🌟 2. ส่วนของ Best Score (เก็บทับแบบเดิม เพื่อใช้ในหน้าวิชา)
+      final docRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('scores')
+          .doc('${widget.subjectId}_${widget.setId}');
+
       final docSnap = await docRef.get();
       int currentBest = 0;
 
@@ -139,7 +155,6 @@ class _ResultPageState extends State<ResultPage> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        // 🔴 ถอด const ออกเพื่อให้ใช้ตัวแปรได้
                         child: Column(
                           children: [
                             Text(
@@ -150,7 +165,7 @@ class _ResultPageState extends State<ResultPage> {
                             
                             _RowItem("Correct Answers", "${widget.score}"),
                             _RowItem("Incorrect Answers", "${widget.totalQuestions - widget.score}"),
-                            const _RowItem("Time Used", "-"), // ซ่อนเวลาไว้ก่อนเพราะเรายังไม่ได้ทำระบบจับเวลา
+                            const _RowItem("Time Used", "-"), 
                             _RowItem("Best Score", "$bestScore/${widget.totalQuestions}"),
                           ],
                         ),
@@ -169,7 +184,6 @@ class _ResultPageState extends State<ResultPage> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),
                           onPressed: () {
-                            // 🔴 กดทำใหม่ ก็ย้อนกลับไปหน้า QuizPage โดยส่ง ID เดิมไป
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(builder: (_) => QuizPage(
@@ -195,7 +209,6 @@ class _ResultPageState extends State<ResultPage> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),
                           onPressed: () {
-                            // 🔴 เด้งกลับไปหน้ารายละเอียดวิชา
                             Navigator.pop(context);
                           },
                           child: const Text("Back to Course", style: TextStyle(fontSize: 17, fontFamily: 'SF-Pro')),

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fl_chart/fl_chart.dart'; 
 
 class CourseAnalysisPage extends StatefulWidget {
   const CourseAnalysisPage({super.key});
@@ -8,10 +11,135 @@ class CourseAnalysisPage extends StatefulWidget {
 }
 
 class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
+  List<Map<String, dynamic>> _subjects = [];
+  String? _selectedSubjectId;
+  bool _isLoadingSubjects = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubjects();
+  }
+
+  Future<void> _loadSubjects() async {
+    try {
+      final snap = await FirebaseFirestore.instance.collection('subjects').get();
+      final subs = snap.docs.map((d) => {
+        'id': d.id, 
+        'code': d['code'], 
+        'name': d['name']
+      }).toList();
+
+      if (subs.isNotEmpty) {
+        setState(() {
+          _subjects = subs;
+          _selectedSubjectId = subs.first['id']; 
+          _isLoadingSubjects = false;
+        });
+      }
+    } catch (e) {
+      setState(() => _isLoadingSubjects = false);
+    }
+  }
+
+  Future<Map<String, dynamic>> _fetchCourseData() async {
+    if (_selectedSubjectId == null) return {};
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return {};
+
+    final scoresSnap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('scores')
+        .get();
+
+    Map<String, int> setScores = {'set1': 0, 'set2': 0, 'set3': 0, 'set4': 0};
+    int completedSets = 0;
+
+    for (var doc in scoresSnap.docs) {
+      if (doc.id.startsWith('${_selectedSubjectId}_')) {
+        String setId = doc.id.split('_')[1]; 
+        setScores[setId] = doc.data()['bestScore'] ?? 0;
+        completedSets++;
+      }
+    }
+
+    List<List<Color>> colorsList = [
+      [const Color(0xFFF96D52), const Color(0xFFF4C873)], 
+      [const Color(0xFF8F70FF), const Color(0xFF56E0E0)], 
+      [const Color(0xFF1ED6B4), const Color(0xFF1CB5E0)], 
+      [const Color(0xFF7F00FF), const Color(0xFFE100FF)], 
+    ];
+
+    List<Map<String, dynamic>> setProgress = [
+      {'name': 'Set 1', 'score': setScores['set1']!, 'colors': colorsList[0]},
+      {'name': 'Set 2', 'score': setScores['set2']!, 'colors': colorsList[1]},
+      {'name': 'Set 3', 'score': setScores['set3']!, 'colors': colorsList[2]},
+      {'name': 'Set 4', 'score': setScores['set4']!, 'colors': colorsList[3]},
+    ];
+
+    final historySnap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('history')
+        .orderBy('timestamp') 
+        .get();
+
+    int totalAttempts = 0;
+    double sumPercent = 0;
+    double bestPercent = 0;
+    List<FlSpot> scoreSpots = []; 
+    List<FlSpot> avgSpots = [];   
+
+    int index = 0;
+    double runningSum = 0;
+    for (var doc in historySnap.docs) {
+      var data = doc.data();
+      if (data['subjectId'] == _selectedSubjectId) {
+        totalAttempts++;
+        int score = data['score'] ?? 0;
+        int tq = data['totalQuestions'] ?? 20;
+        double p = tq > 0 ? (score / tq) * 100 : 0;
+
+        sumPercent += p;
+        runningSum += p;
+        if (p > bestPercent) bestPercent = p;
+
+        scoreSpots.add(FlSpot(index.toDouble(), p));
+        avgSpots.add(FlSpot(index.toDouble(), runningSum / totalAttempts)); 
+        index++;
+      }
+    }
+
+    if (totalAttempts == 0) {
+      scoreSpots = [const FlSpot(0, 0), const FlSpot(1, 0)];
+      avgSpots = [const FlSpot(0, 0), const FlSpot(1, 0)];
+    }
+
+    double avgScore = totalAttempts > 0 ? sumPercent / totalAttempts : 0.0;
+    double completionRate = (completedSets / 4.0) * 100.0; 
+
+    return {
+      'totalAttempts': totalAttempts,
+      'avgScore': avgScore,
+      'bestScore': bestPercent,
+      'completionRate': completionRate > 100 ? 100.0 : completionRate,
+      'setProgress': setProgress,
+      'scoreSpots': scoreSpots,
+      'avgSpots': avgSpots,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
+    String currentSubjectName = 'Course';
+    if (_selectedSubjectId != null && _subjects.isNotEmpty) {
+      var subj = _subjects.firstWhere((s) => s['id'] == _selectedSubjectId);
+      currentSubjectName = '${subj['code']} ${subj['name']}'; 
+    }
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0053CC), // สีพื้นหลังหลัก
+      backgroundColor: Colors.transparent, 
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -19,227 +147,308 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF003E99),
-              Color(0xFF0053CC),
-              Color(0xFF227CFF),
-            ],
+            colors: [Color(0xFF003E99), Color(0xFF0053CC), Color(0xFF227CFF)],
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center, // จัดให้อยู่กึ่งกลาง
-              children: [
-                const SizedBox(height: 20),
-                // 1. Header (Back Button + Fire Icon + Title)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
+          child: _isLoadingSubjects 
+          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          : FutureBuilder<Map<String, dynamic>>(
+            future: _fetchCourseData(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator(color: Colors.white));
+              }
+
+              final data = snapshot.data ?? {};
+              final totalAttempts = data['totalAttempts'] ?? 0;
+              final avgScore = (data['avgScore'] ?? 0.0).toStringAsFixed(0);
+              final bestScore = (data['bestScore'] ?? 0.0).toStringAsFixed(0);
+              final completionRate = (data['completionRate'] ?? 0.0).toStringAsFixed(0);
+              final List<Map<String, dynamic>> setProgress = data['setProgress'] ?? [];
+              final List<FlSpot> scoreSpots = data['scoreSpots'] ?? [const FlSpot(0, 0)];
+              final List<FlSpot> avgSpots = data['avgSpots'] ?? [const FlSpot(0, 0)];
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center, 
                   children: [
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 24),
-                        ),
-                      ),
-                    ),
+                    const SizedBox(height: 20),
+                    // 1. Header 
                     Row(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const Icon(Icons.local_fire_department, color: Color(0xFFFF9500), size: 36),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Courses',
-                          style: TextStyle(
-                            color: Color(0xFFFF9500),
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'SF-Pro',
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: GestureDetector(
+                              onTap: () => Navigator.pop(context),
+                              child: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 24),
+                            ),
                           ),
                         ),
-                      ],
-                    ),
-                    const Expanded(child: SizedBox()),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // 2. Search Bar
-                Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: const TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search Course',
-                      hintStyle: TextStyle(color: Colors.grey, fontFamily: 'SF-Pro'),
-                      prefixIcon: Icon(Icons.search, color: Colors.black87),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 15),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // 3. Course Selector (Button)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF2F5F8), // ขาวอมเทา
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Course',
-                      style: TextStyle(
-                        color: Color(0xFFFF9500),
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'SF-Pro',
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // 4. Main White Container (พื้นหลังหลักสีขาวอมเทาสำหรับเนื้อหาด้านล่างทั้งหมด)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF2F5F8),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 4.1 Grid 2x2 Stat Cards
-                      Row(
-                        children: [
-                          Expanded(child: _buildStatCard('Total\nAttempts', '0', '')),
-                          const SizedBox(width: 16),
-                          Expanded(child: _buildStatCard('Average Score', '0', ' %')),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(child: _buildStatCard('Best Score', '0', ' %')),
-                          const SizedBox(width: 16),
-                          Expanded(child: _buildStatCard('Completion\nRate', '0', ' %')),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // 4.2 Course Process Section
-                      const Text(
-                        'Course Process',
-                        style: TextStyle(
-                          color: Color(0xFFFF9500),
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'SF-Pro',
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // กล่องพื้นหลังสีเทาอ่อนสำหรับ Progress Bars
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE2E6EC), // สีเทาอ่อนๆ ตามแบบ
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Column(
+                        const Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildProgressRow('Module Completed', 0.6, '6/10', const [Color(0xFFF96D52), Color(0xFFF4C873)]),
-                            _buildProgressRow('Module Completed', 0.4, '4/10', const [Color(0xFF8F70FF), Color(0xFF56E0E0)]),
-                            _buildProgressRow('Module Completed', 0.7, '7/10', const [Color(0xFF1ED6B4), Color(0xFF1CB5E0)]),
-                            _buildProgressRow('Module Completed', 0.5, '5/10', const [Color(0xFF7F00FF), Color(0xFFE100FF)]),
+                            Icon(Icons.local_fire_department, color: Color(0xFFFF9500), size: 36),
+                            SizedBox(width: 8),
+                            Text('Courses', style: TextStyle(color: Color(0xFFFF9500), fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 30),
+                        const Expanded(child: SizedBox()),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
 
-                      // 4.3 Line Chart Area
-                      SizedBox(
-                        height: 180,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            // แกน Y (เส้นขีดๆ)
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: List.generate(12, (index) => Container(
-                                width: 8, height: 1.5, color: Colors.grey[500],
-                                margin: const EdgeInsets.symmetric(vertical: 6.5),
-                              )),
+                    // 2. Search Bar
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
+                      child: Autocomplete<Map<String, dynamic>>(
+                        displayStringForOption: (option) => '${option['code']} ${option['name']}',
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) {
+                            return _subjects; 
+                          }
+                          return _subjects.where((subj) {
+                            final String full = '${subj['code']} ${subj['name']}';
+                            return full.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                          });
+                        },
+                        onSelected: (Map<String, dynamic> selection) {
+                          setState(() {
+                            _selectedSubjectId = selection['id']; 
+                          });
+                        },
+                        fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                          return TextField(
+                            controller: textEditingController,
+                            focusNode: focusNode,
+                            style: const TextStyle(fontFamily: 'SF-Pro', color: Colors.black87),
+                            decoration: const InputDecoration(
+                              hintText: 'Search Course',
+                              hintStyle: TextStyle(color: Colors.grey, fontFamily: 'SF-Pro'),
+                              prefixIcon: Icon(Icons.search, color: Colors.black87),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(vertical: 15),
                             ),
-                            // ตัวกราฟเส้น
-                            Expanded(
+                          );
+                        },
+                        optionsViewBuilder: (context, onSelected, options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              color: Colors.transparent,
                               child: Container(
+                                width: MediaQuery.of(context).size.width - 40,
+                                margin: const EdgeInsets.only(top: 8),
                                 decoration: BoxDecoration(
-                                  border: Border(
-                                    left: BorderSide(color: Colors.grey[500]!, width: 1.5),
-                                    bottom: BorderSide(color: Colors.grey[500]!, width: 1.5),
-                                  ),
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
                                 ),
-                                child: CustomPaint(
-                                  painter: MockLineChartPainter(),
-                                  child: Container(),
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero,
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (BuildContext context, int index) {
+                                    final option = options.elementAt(index);
+                                    return ListTile(
+                                      title: Text('${option['code']} ${option['name']}', style: const TextStyle(fontFamily: 'SF-Pro', fontSize: 14)),
+                                      onTap: () => onSelected(option),
+                                    );
+                                  },
                                 ),
                               ),
                             ),
-                          ],
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 3. Course Name Display 
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(color: const Color(0xFFF2F5F8), borderRadius: BorderRadius.circular(30)),
+                      child: Center(
+                        child: Text(
+                          currentSubjectName, 
+                          style: const TextStyle(color: Color(0xFFFF9500), fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis, 
                         ),
                       ),
-                      const SizedBox(height: 16),
+                    ),
+                    const SizedBox(height: 16),
 
-                      // 4.4 Legend (คำอธิบายสีเส้นกราฟ)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
+                    // 4. Main White Container 
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(color: const Color(0xFFF2F5F8), borderRadius: BorderRadius.circular(24)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(width: 20),
-                          _buildLegendDot(const Color(0xFFF96D52), 'Score'),
-                          const SizedBox(width: 40),
-                          _buildLegendDot(const Color(0xFF8F70FF), 'Average Score'),
+                          // 🔴 4.1 Grid 2x2 Stat Cards (ดีไซน์ใหม่)
+                          Row(
+                            children: [
+                              Expanded(child: _buildStatCard('Total\nAttempts', '$totalAttempts', '', Icons.replay_circle_filled_rounded, const Color(0xFFF96D52))), // สีส้มแดง
+                              const SizedBox(width: 16),
+                              Expanded(child: _buildStatCard('Average\nScore', avgScore, ' %', Icons.analytics_rounded, const Color(0xFF8F70FF))), // สีม่วง
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(child: _buildStatCard('Best\nScore', bestScore, ' %', Icons.emoji_events_rounded, const Color(0xFFFF9500))), // สีเหลืองทอง
+                              const SizedBox(width: 16),
+                              Expanded(child: _buildStatCard('Completion\nRate', completionRate, ' %', Icons.check_circle_rounded, const Color(0xFF1ED6B4))), // สีเขียวมิ้นต์
+                            ],
+                          ),
+                          const SizedBox(height: 24), // เพิ่มระยะห่างนิดนึงให้หายใจสะดวกขึ้น
+
+                          // 4.2 Course Process Section 
+                          const Text('Course Process', style: TextStyle(color: Color(0xFFFF9500), fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
+                          const SizedBox(height: 16),
+                          
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(color: const Color(0xFFE2E6EC), borderRadius: BorderRadius.circular(20)),
+                            child: Column(
+                              children: setProgress.map((setInfo) {
+                                double prog = setInfo['score'] / 20.0;
+                                if (prog > 1.0) prog = 1.0;
+                                return _buildProgressRow(
+                                  setInfo['name'], 
+                                  prog, 
+                                  '${setInfo['score']}/20',
+                                  setInfo['colors']
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 30),
+
+                          // 4.3 Line Chart Area
+                          SizedBox(
+                            height: 180,
+                            child: LineChart(
+                              LineChartData(
+                                gridData: FlGridData(
+                                  show: true,
+                                  drawVerticalLine: false,
+                                  getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.shade400, strokeWidth: 1.5, dashArray: [5, 5]),
+                                ),
+                                titlesData: FlTitlesData(show: false),
+                                borderData: FlBorderData(
+                                  show: true,
+                                  border: Border(
+                                    left: BorderSide(color: Colors.grey.shade500, width: 1.5),
+                                    bottom: BorderSide(color: Colors.grey.shade500, width: 1.5),
+                                  ),
+                                ),
+                                lineBarsData: [
+                                  LineChartBarData(
+                                    spots: avgSpots,
+                                    isCurved: true,
+                                    color: const Color(0xFF8F70FF),
+                                    barWidth: 3,
+                                    isStrokeCapRound: true,
+                                    dotData: const FlDotData(show: false),
+                                    belowBarData: BarAreaData(show: false),
+                                  ),
+                                  LineChartBarData(
+                                    spots: scoreSpots,
+                                    isCurved: true,
+                                    color: const Color(0xFFF96D52),
+                                    barWidth: 3,
+                                    isStrokeCapRound: true,
+                                    dotData: const FlDotData(show: false),
+                                    belowBarData: BarAreaData(show: false),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // 4.4 Legend 
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              const SizedBox(width: 20),
+                              _buildLegendDot(const Color(0xFFF96D52), 'Score'),
+                              const SizedBox(width: 40),
+                              _buildLegendDot(const Color(0xFF8F70FF), 'Average Score'),
+                            ],
+                          ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
                 ),
-                const SizedBox(height: 40),
-              ],
-            ),
+              );
+            }
           ),
         ),
       ),
     );
   }
 
-  // Widget สำหรับสร้างกล่องสถิติย่อย 4 กล่อง
-  Widget _buildStatCard(String title, String value, String unit) {
+  // 🔴 Widget สร้าง Stat Card ฉบับอัปเกรด (สีขาว, มีขอบ, มีไอคอนสีสวยๆ)
+  Widget _buildStatCard(String title, String value, String unit, IconData icon, Color accentColor) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFD9E2EC), // สีเทาอ่อน
+        color: Colors.white, 
         borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withOpacity(0.1), // เงาบางๆ เป็นสีเดียวกับ Theme
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: accentColor.withOpacity(0.2), width: 1.5), 
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: const TextStyle(color: Color(0xFF4FA0FF), fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro'), // สีฟ้าสว่าง
+          // แถวบน: ไอคอน + ชื่อหัวข้อ
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: accentColor, size: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.black54, 
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'SF-Pro'
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          // แถวล่าง: ตัวเลข + หน่วย
           Align(
             alignment: Alignment.bottomRight,
             child: Row(
@@ -247,8 +456,25 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro', color: Colors.black87)),
-                if (unit.isNotEmpty) Text(unit, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro', color: Colors.black87)),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 26, 
+                    fontWeight: FontWeight.w900, 
+                    fontFamily: 'SF-Pro',
+                    color: accentColor, // สีตัวเลขดึงดูดสายตา
+                  )
+                ),
+                if (unit.isNotEmpty)
+                  Text(
+                    unit,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'SF-Pro',
+                      color: Colors.black45,
+                    )
+                  ),
               ],
             ),
           ),
@@ -257,17 +483,13 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
     );
   }
 
-  // Widget สำหรับสร้างหลอด Progress Bar ในหน้า Courses
   Widget _buildProgressRow(String label, double progress, String ratioText, List<Color> gradientColors) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF4FA0FF), fontFamily: 'SF-Pro'),
-          ),
+          Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF4FA0FF), fontFamily: 'SF-Pro')),
           const SizedBox(height: 4),
           Row(
             children: [
@@ -277,18 +499,12 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                     return Container(
                       height: 8,
                       width: constraints.maxWidth,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[400], // สีหลอดพื้นหลัง (สีเทาเข้มขึ้นนิดนึง)
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                      decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(10)),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Container(
                           width: constraints.maxWidth * progress,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(colors: gradientColors),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                          decoration: BoxDecoration(gradient: LinearGradient(colors: gradientColors), borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     );
@@ -297,12 +513,8 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
               ),
               const SizedBox(width: 12),
               SizedBox(
-                width: 35, // กำหนดความกว้างตายตัวให้ข้อความตรงกัน
-                child: Text(
-                  ratioText,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'SF-Pro'),
-                  textAlign: TextAlign.right,
-                ),
+                width: 45, 
+                child: Text(ratioText, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'SF-Pro'), textAlign: TextAlign.right),
               ),
             ],
           ),
@@ -311,53 +523,13 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
     );
   }
 
-  // Widget สำหรับสร้างจุดสีอธิบายกราฟ
   Widget _buildLegendDot(Color color, String label) {
     return Row(
       children: [
-        Container(
-          width: 12, height: 12,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
+        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 8),
         Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
       ],
     );
   }
-}
-
-// คลาสพิเศษสำหรับวาดกราฟเส้นโค้งจำลอง (Mock Line Chart)
-class MockLineChartPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint1 = Paint()
-      ..color = const Color(0xFFF4C873) // สีเหลืองส้ม
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final paint2 = Paint()
-      ..color = const Color(0xFF8F70FF).withOpacity(0.8) // สีม่วงอมฟ้า
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    // เส้นที่ 1 (สีส้ม)
-    final path1 = Path();
-    path1.moveTo(0, size.height * 0.4);
-    path1.quadraticBezierTo(size.width * 0.25, size.height * 0.8, size.width * 0.5, size.height * 0.4);
-    path1.quadraticBezierTo(size.width * 0.75, size.height * 0.05, size.width, size.height * 0.8);
-    canvas.drawPath(path1, paint1);
-
-    // เส้นที่ 2 (สีม่วง)
-    final path2 = Path();
-    path2.moveTo(0, size.height * 0.7);
-    path2.quadraticBezierTo(size.width * 0.15, size.height * 0.1, size.width * 0.4, size.height * 0.4);
-    path2.quadraticBezierTo(size.width * 0.65, size.height * 0.8, size.width * 0.85, size.height * 0.6);
-    path2.quadraticBezierTo(size.width * 0.95, size.height * 0.5, size.width, size.height * 0.3);
-    canvas.drawPath(path2, paint2);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
