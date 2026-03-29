@@ -14,18 +14,17 @@ class QuizPage extends StatefulWidget {
 }
 
 class _QuizPageState extends State<QuizPage> {
-  int selected = -1;
-  bool answered = false;
   int score = 0; 
   int currentQuestionIndex = 0; 
 
   List<Map<String, dynamic>> questions = []; 
+  // 🔴 1. สร้าง List เพื่อเก็บ "คำตอบของทุกข้อ" (ค่า -1 คือยังไม่ได้ตอบ)
+  List<int> userAnswers = []; 
   bool isLoading = true;
 
-  // 🔴 เปลี่ยนระบบจับเวลาเป็นแบบ "นับเดินหน้า"
   Timer? _timer;
-  int _timeSpentInSeconds = 0; // เวลาที่ใช้ไป (เริ่มที่ 0)
-  int _timeLimitInSeconds = 0; // เวลาจำกัดของ Set นี้
+  int _timeSpentInSeconds = 0; 
+  int _timeLimitInSeconds = 0; 
 
   @override
   void initState() {
@@ -64,6 +63,8 @@ class _QuizPageState extends State<QuizPage> {
       if (mounted) {
         setState(() {
           questions = snapshot.docs.map((doc) => doc.data()).toList();
+          // 🔴 2. สร้างกล่องเก็บคำตอบให้เท่ากับจำนวนข้อสอบที่มี (ใส่ค่าเริ่มต้นเป็น -1)
+          userAnswers = List.filled(questions.length, -1);
           _timeLimitInSeconds = timeLimitMins * 60; 
           isLoading = false;
         });
@@ -77,14 +78,12 @@ class _QuizPageState extends State<QuizPage> {
     }
   }
 
-  // 🔴 ฟังก์ชันเริ่มจับเวลา (นับเพิ่มขึ้นเรื่อยๆ)
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        _timeSpentInSeconds++; // นับเวลาเพิ่มขึ้น 1 วินาที
+        _timeSpentInSeconds++; 
       });
       
-      // เช็คว่าใช้เวลาเกินกำหนดหรือยัง ถ้าเกินให้บังคับส่ง
       if (_timeLimitInSeconds > 0 && _timeSpentInSeconds >= _timeLimitInSeconds) {
         _timer?.cancel();
         _submitQuiz(isTimeUp: true); 
@@ -111,7 +110,6 @@ class _QuizPageState extends State<QuizPage> {
       );
     }
 
-    // 🔴 ปิด Timer ก่อนย้ายหน้า
     _timer?.cancel();
 
     Navigator.pushReplacement(
@@ -121,13 +119,17 @@ class _QuizPageState extends State<QuizPage> {
         totalQuestions: questions.length, 
         subjectId: widget.subjectId,
         setId: widget.setId,
-        timeSpent: _timeSpentInSeconds, // 🌟 ส่งเวลาที่ใช้ไปทั้งหมดไปให้หน้า Result
+        timeSpent: _timeSpentInSeconds, 
       )),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // 🔴 3. เช็คว่าข้อปัจจุบัน "ตอบไปแล้วหรือยัง" โดยดูจากค่าใน userAnswers
+    bool hasAnsweredCurrent = userAnswers.isNotEmpty && userAnswers[currentQuestionIndex] != -1;
+    int currentSelected = userAnswers.isNotEmpty ? userAnswers[currentQuestionIndex] : -1;
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -152,7 +154,6 @@ class _QuizPageState extends State<QuizPage> {
                 margin: const EdgeInsets.only(right: 16),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  // 🔴 ถ้าเวลาใกล้หมด (เหลือ 1 นาทีสุดท้าย) จะเปลี่ยนเป็นสีแดง
                   color: (_timeLimitInSeconds - _timeSpentInSeconds <= 60) 
                          ? Colors.redAccent 
                          : Colors.white.withOpacity(0.2), 
@@ -163,7 +164,7 @@ class _QuizPageState extends State<QuizPage> {
                     const Icon(Icons.timer_outlined, color: Colors.white, size: 18),
                     const SizedBox(width: 6),
                     Text(
-                      _formatTime(_timeSpentInSeconds), // แสดงเวลาที่ใช้ไป
+                      _formatTime(_timeSpentInSeconds), 
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro', fontSize: 16),
                     ),
                   ],
@@ -189,12 +190,18 @@ class _QuizPageState extends State<QuizPage> {
                             (index) {
                               List<dynamic> options = questions[currentQuestionIndex]['options'];
                               int correctIndex = questions[currentQuestionIndex]['correctAnswerIndex'];
-                              return _choice(options[index].toString(), index, correctIndex);
+                              return _choice(
+                                options[index].toString(), 
+                                index, 
+                                correctIndex, 
+                                hasAnsweredCurrent, 
+                                currentSelected
+                              );
                             },
                           ),
                           const SizedBox(height: 20),
 
-                          if (answered)
+                          if (hasAnsweredCurrent)
                             Center(
                               child: Container(
                                 margin: const EdgeInsets.only(top: 10),
@@ -202,17 +209,17 @@ class _QuizPageState extends State<QuizPage> {
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: selected == questions[currentQuestionIndex]['correctAnswerIndex'] ? Colors.greenAccent : Colors.redAccent,
+                                    color: currentSelected == questions[currentQuestionIndex]['correctAnswerIndex'] ? Colors.greenAccent : Colors.redAccent,
                                     width: 2,
                                   ),
                                 ),
                                 child: Text(
-                                  selected == questions[currentQuestionIndex]['correctAnswerIndex']
+                                  currentSelected == questions[currentQuestionIndex]['correctAnswerIndex']
                                       ? "Correct! 🎉"
                                       : "Incorrect\nCorrect answer: ${questions[currentQuestionIndex]['options'][questions[currentQuestionIndex]['correctAnswerIndex']]}",
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    color: selected == questions[currentQuestionIndex]['correctAnswerIndex'] ? Colors.greenAccent : Colors.redAccent,
+                                    color: currentSelected == questions[currentQuestionIndex]['correctAnswerIndex'] ? Colors.greenAccent : Colors.redAccent,
                                     fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro'
                                   ),
                                 ),
@@ -220,33 +227,56 @@ class _QuizPageState extends State<QuizPage> {
                             ),
                           const Spacer(),
 
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: answered ? const Color(0xFF0A2A66) : Colors.grey[400], 
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 18),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                elevation: 6,
+                          // 🔴 4. เพิ่มปุ่ม Back ควบคู่ไปกับปุ่ม Next
+                          Row(
+                            children: [
+                              if (currentQuestionIndex > 0) ...[
+                                Expanded(
+                                  flex: 1,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white.withOpacity(0.2), 
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 18),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                      elevation: 0,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        currentQuestionIndex--; // ถอยหลัง 1 ข้อ
+                                      });
+                                    },
+                                    child: const Text("Back", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                              ],
+                              Expanded(
+                                flex: 2,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: hasAnsweredCurrent ? const Color(0xFF0A2A66) : Colors.grey[400], 
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 18),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                    elevation: hasAnsweredCurrent ? 6 : 0,
+                                  ),
+                                  onPressed: hasAnsweredCurrent ? () {
+                                    if (currentQuestionIndex < questions.length - 1) {
+                                      setState(() {
+                                        currentQuestionIndex++; // ไปข้อถัดไป
+                                      });
+                                    } else {
+                                      _submitQuiz(); // ส่งข้อสอบ
+                                    }
+                                  } : null,
+                                  child: Text(
+                                    currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish Quiz", 
+                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')
+                                  ),
+                                ),
                               ),
-                              onPressed: () {
-                                if (!answered) return; 
-                                if (currentQuestionIndex < questions.length - 1) {
-                                  setState(() {
-                                    currentQuestionIndex++;
-                                    answered = false; 
-                                    selected = -1;
-                                  });
-                                } else {
-                                  _submitQuiz();
-                                }
-                              },
-                              child: Text(
-                                currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish Quiz", 
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')
-                              ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
@@ -256,14 +286,16 @@ class _QuizPageState extends State<QuizPage> {
     );
   }
 
-  Widget _choice(String text, int index, int correctIndex) {
+  // 🔴 อัปเดตฟังก์ชันรับพารามิเตอร์เพิ่ม เพื่อให้มันรู้สถานะของข้อปัจจุบัน
+  Widget _choice(String text, int index, int correctIndex, bool hasAnsweredCurrent, int currentSelected) {
     return GestureDetector(
       onTap: () {
-        if (answered) return;
+        // ถ้าตอบไปแล้ว ห้ามกดเปลี่ยนคำตอบอีก
+        if (hasAnsweredCurrent) return;
+        
         setState(() {
-          selected = index;
-          answered = true;
-          if (selected == correctIndex) {
+          userAnswers[currentQuestionIndex] = index; // บันทึกคำตอบลงในกล่อง
+          if (index == correctIndex) {
             score++;
           }
         });
@@ -272,7 +304,7 @@ class _QuizPageState extends State<QuizPage> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _getColor(index, correctIndex),
+          color: _getColor(index, correctIndex, hasAnsweredCurrent, currentSelected),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.black12, width: 1.5), 
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5))],
@@ -281,18 +313,18 @@ class _QuizPageState extends State<QuizPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(child: Text(text, style: const TextStyle(color: Colors.black, fontSize: 16, fontFamily: 'SF-Pro', fontWeight: FontWeight.w500))),
-            if (answered && index == correctIndex) const Icon(Icons.check_circle, color: Colors.green)
-            else if (answered && index == selected && index != correctIndex) const Icon(Icons.cancel, color: Colors.red),
+            if (hasAnsweredCurrent && index == correctIndex) const Icon(Icons.check_circle, color: Colors.green)
+            else if (hasAnsweredCurrent && index == currentSelected && index != correctIndex) const Icon(Icons.cancel, color: Colors.red),
           ],
         ),
       ),
     );
   }
 
-  Color _getColor(int index, int correctIndex) {
-    if (!answered) return Colors.white.withOpacity(0.95);
+  Color _getColor(int index, int correctIndex, bool hasAnsweredCurrent, int currentSelected) {
+    if (!hasAnsweredCurrent) return Colors.white.withOpacity(0.95);
     if (index == correctIndex) return Colors.green.shade100; 
-    if (index == selected && index != correctIndex) return Colors.red.shade100; 
+    if (index == currentSelected && index != correctIndex) return Colors.red.shade100; 
     return Colors.white.withOpacity(0.4); 
   }
 }
