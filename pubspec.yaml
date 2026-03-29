@@ -14,8 +14,10 @@ dependencies:
   fl_chart: ^1.2.0
   flutter:
     sdk: flutter
+  flutter_cached_pdfview: ^0.4.3
   image_picker: ^1.2.1
   intl: ^0.20.2
+  shake: ^3.0.0
   url_launcher: ^6.3.2
 
 dev_dependencies:
