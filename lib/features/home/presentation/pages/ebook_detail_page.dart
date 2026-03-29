@@ -1,40 +1,38 @@
-import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart'; 
+import 'package:flutter/material.dart'; 
+import 'pdf_viewer_page.dart';
 
 class EbookDetailPage extends StatelessWidget {
   final String courseTitle;
   final String description;
   final List<String> pdfFiles;
+  final bool isDarkMode;
 
   const EbookDetailPage({
     super.key,
     required this.courseTitle,
     required this.description,
     required this.pdfFiles,
+    required this.isDarkMode,
   });
 
-  Future<void> _openPdf(BuildContext context, String pdfString) async {
+  Future<void> _openPdf(BuildContext context, String pdfString, String fileName) async {
     if (pdfString.startsWith('http://') || pdfString.startsWith('https://')) {
-      final Uri url = Uri.parse(pdfString);
-      try {
-        if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-          throw Exception('Could not launch $url');
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('The PDF file cannot be opened.', style: TextStyle(fontFamily: 'SF-Pro')),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
-        }
-      }
+      // เปลี่ยนจากการเด้งออกนอกแอป เป็นการเปิดหน้า PdfViewerPage แทน!
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PdfViewerPage(
+            title: fileName,
+            pdfUrl: pdfString,
+            isDarkMode: isDarkMode,
+          ),
+        ),
+      );
     } else {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Opening file: $pdfString\n(Preparing to connect to the real link from Firebase)', style: const TextStyle(fontFamily: 'SF-Pro')),
+            content: Text('Opening file: $pdfString\n(Get ready to connect the real link.)', style: const TextStyle(fontFamily: 'SF-Pro')),
             backgroundColor: const Color(0xFF4FA0FF),
             duration: const Duration(seconds: 2),
           ),
@@ -46,7 +44,7 @@ class EbookDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1B6DF9), 
+      backgroundColor: isDarkMode ? const Color(0xFF121212) : const Color(0xFF1B6DF9), 
       body: SafeArea(
         child: Column(
           children: [
@@ -144,8 +142,8 @@ class EbookDetailPage extends StatelessWidget {
                     ),
                     clipBehavior: Clip.antiAlias, 
                     child: InkWell(
-                      // 🔴 3. ตอนกดเปิด ให้ส่ง URL เต็มๆ ไปให้ระบบหลังบ้านเปิดทำงาน
-                      onTap: () => _openPdf(context, fullUrl), 
+                      // 3. ตอนกดเปิด ให้ส่ง URL เต็มๆ ไปให้ระบบหลังบ้านเปิดทำงาน
+                      onTap: () => _openPdf(context, fullUrl, fileName),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                         child: Row(
@@ -155,7 +153,7 @@ class EbookDetailPage extends StatelessWidget {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                // 🔴 4. โชว์แค่ชื่อไฟล์สวยๆ สั้นๆ บนหน้าจอ
+                                // 4. โชว์แค่ชื่อไฟล์สวยๆ สั้นๆ บนหน้าจอ
                                 fileName,
                                 style: const TextStyle(
                                   color: Color(0xFF4FA0FF), 

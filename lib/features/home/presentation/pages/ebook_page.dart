@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shake/shake.dart'; // 🔴 1. Import แพ็กเกจ shake
 import 'ebook_detail_page.dart';
 
 class EbookPage extends StatefulWidget {
@@ -14,26 +15,52 @@ class _EbookPageState extends State<EbookPage> {
   String _searchQuery = "";
   final TextEditingController _searchController = TextEditingController();
 
-  // สร้าง Stream สำหรับดึงข้อมูลวิชาทั้งหมดจาก Firebase
   late Stream<QuerySnapshot> _subjectStream;
+
+  // 🔴 2. ตัวแปรสำหรับ Dark Mode และตัวจับการเขย่า
+  bool isDarkMode = false;
+  ShakeDetector? detector;
 
   @override
   void initState() {
     super.initState();
     _subjectStream = FirebaseFirestore.instance.collection('subjects').snapshots();
+    detector = ShakeDetector.autoStart(
+      onPhoneShake: (_) {
+        setState(() {
+          isDarkMode = !isDarkMode; // สลับโหมด มืด/สว่าง
+        });
+        
+        // เด้งแจ้งเตือนสวยๆ ให้ผู้ใช้รู้
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isDarkMode ? '🌙 Night Shift' : '☀️ Day Shift',
+                style: const TextStyle(fontFamily: 'SF-Pro', fontSize: 16),
+              ),
+              backgroundColor: isDarkMode ? const Color(0xFF4FA0FF) : const Color(0xFFFFB03A),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      },
+      shakeThresholdGravity: 2.7, 
+    );
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    detector?.stopListening(); // 🔴 4. ปิดเซ็นเซอร์เมื่อออกจากหน้านี้ (ประหยัดแบต)
     super.dispose();
   }
 
-  // ฟังก์ชันแยกแยะ Year 1 และ Year 2 จากรหัสวิชา (เช่น ITDS120 -> 1 = Year 1)
   bool _isMatchYear(String code, bool wantYear1) {
     if (code.isEmpty) return false;
-    
-    // หาวิธีดึงตัวเลขตัวแรกออกมาจากรหัสวิชา
     final match = RegExp(r'\d').firstMatch(code);
     if (match != null) {
       String firstDigit = match.group(0)!;
@@ -45,16 +72,22 @@ class _EbookPageState extends State<EbookPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 🔴 กำหนดสีพื้นหลังหลักตามโหมด
+    final bgColors = isDarkMode 
+        ? [const Color(0xFF121212), const Color(0xFF1E1E1E), const Color(0xFF2C2C2C)] // สี Dark Mode
+        : [const Color(0xFF003E99), const Color(0xFF0053CC), const Color(0xFF227CFF)]; // สี Light Mode (น้ำเงินเดิม)
+
     return Scaffold(
       backgroundColor: Colors.transparent, 
-      body: Container(
+      body: AnimatedContainer( // ใช้ AnimatedContainer ให้ตอนเปลี่ยนสีมันค่อยๆ เฟด (Smooth)
+        duration: const Duration(milliseconds: 500),
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF003E99), Color(0xFF0053CC), Color(0xFF227CFF)],
+            colors: bgColors,
           ),
         ),
         child: SafeArea(
@@ -69,11 +102,35 @@ class _EbookPageState extends State<EbookPage> {
                       icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
                       onPressed: () => Navigator.pop(context), 
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Center(
-                        child: Text(
-                          'E-Book',
-                          style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro'),
+                        // 🔴 ใช้ GestureDetector มาครอบ Text เพื่อทำปุ่มลัดจำลองการเขย่า
+                        child: GestureDetector(
+                          onLongPress: () {
+                            setState(() {
+                              isDarkMode = !isDarkMode;
+                            });
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).clearSnackBars();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    isDarkMode ? '🌙 Night Shift' : '☀️ Day Shift',
+                                    style: const TextStyle(fontFamily: 'SF-Pro', fontSize: 16),
+                                  ),
+                                  backgroundColor: isDarkMode ? const Color(0xFF4FA0FF) : const Color(0xFFFFB03A),
+                                  duration: const Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              );
+                            }
+                          },
+                          child: const Text(
+                            'E-Book',
+                            style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro'),
+                          ),
                         ),
                       ),
                     ),
@@ -82,35 +139,30 @@ class _EbookPageState extends State<EbookPage> {
                 ),
               ),
 
-              // 2. Search Bar แบบคลีนๆ 
+              // 2. Search Bar 
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 500),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDarkMode ? const Color(0xFF333333) : Colors.white, // เปลี่ยนสีกล่องค้นหา
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))], 
                   ),
                   child: TextField(
                     controller: _searchController,
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value.toLowerCase();
-                      });
-                    },
-                    style: const TextStyle(fontFamily: 'SF-Pro', color: Colors.black87, fontSize: 16),
+                    onChanged: (value) => setState(() => _searchQuery = value.toLowerCase()),
+                    style: TextStyle(fontFamily: 'SF-Pro', color: isDarkMode ? Colors.white : Colors.black87, fontSize: 16),
                     decoration: InputDecoration(
                       hintText: 'Search Book...',
-                      hintStyle: const TextStyle(color: Colors.grey, fontFamily: 'SF-Pro'),
-                      prefixIcon: const Icon(Icons.search, color: Colors.black54),
+                      hintStyle: TextStyle(color: isDarkMode ? Colors.white54 : Colors.grey, fontFamily: 'SF-Pro'),
+                      prefixIcon: Icon(Icons.search, color: isDarkMode ? Colors.white54 : Colors.black54),
                       suffixIcon: _searchQuery.isNotEmpty 
                           ? IconButton(
                               icon: const Icon(Icons.cancel, color: Colors.grey),
                               onPressed: () {
                                 _searchController.clear();
-                                setState(() {
-                                  _searchQuery = ""; 
-                                });
+                                setState(() => _searchQuery = ""); 
                               },
                             )
                           : null,
@@ -127,13 +179,9 @@ class _EbookPageState extends State<EbookPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 child: Row(
                   children: [
-                    Expanded(child: _buildTab('Year 1', isYear1Selected, () {
-                      setState(() => isYear1Selected = true);
-                    })),
+                    Expanded(child: _buildTab('Year 1', isYear1Selected, () => setState(() => isYear1Selected = true))),
                     const SizedBox(width: 16),
-                    Expanded(child: _buildTab('Year 2', !isYear1Selected, () {
-                      setState(() => isYear1Selected = false);
-                    }, selectedColor: const Color(0xFFE46CF4))), 
+                    Expanded(child: _buildTab('Year 2', !isYear1Selected, () => setState(() => isYear1Selected = false), selectedColor: const Color(0xFFE46CF4))), 
                   ],
                 ),
               ),
@@ -147,11 +195,8 @@ class _EbookPageState extends State<EbookPage> {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator(color: Colors.white));
                     }
-                    if (snapshot.hasError) {
-                      return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล', style: TextStyle(color: Colors.white, fontFamily: 'SF-Pro')));
-                    }
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return const Center(child: Text('ไม่พบรายวิชา', style: TextStyle(color: Colors.white, fontSize: 18, fontFamily: 'SF-Pro')));
+                      return const Center(child: Text('Course not found', style: TextStyle(color: Colors.white, fontSize: 18, fontFamily: 'SF-Pro')));
                     }
 
                     final allSubjects = snapshot.data!.docs;
@@ -170,10 +215,7 @@ class _EbookPageState extends State<EbookPage> {
 
                     if (filteredSubjects.isEmpty) {
                       return const Center(
-                        child: Text(
-                          'No E-Books found.', 
-                          style: TextStyle(color: Colors.white70, fontSize: 16, fontFamily: 'SF-Pro')
-                        )
+                        child: Text('No E-Books found.', style: TextStyle(color: Colors.white70, fontSize: 16, fontFamily: 'SF-Pro'))
                       );
                     }
 
@@ -184,13 +226,10 @@ class _EbookPageState extends State<EbookPage> {
                         var subjectData = filteredSubjects[index].data() as Map<String, dynamic>;
                         String code = subjectData['code'] ?? '';
                         String name = subjectData['name'] ?? 'Unknown Subject';
-                        
                         String description = subjectData['description'] ?? 'Course material for $name. Tap to view documents and PDFs.';
                         
-                        // 🔴 1. ดึงข้อมูล pdfLinks ของจริงจาก Firebase
                         List<String> pdfs = [];
                         if (subjectData['pdfLinks'] != null) {
-                           // แปลง Array จาก Firebase ให้เป็น List<String>
                            pdfs = List<String>.from(subjectData['pdfLinks']);
                         }
 
@@ -199,7 +238,8 @@ class _EbookPageState extends State<EbookPage> {
                           code: code,
                           title: name,
                           description: description,
-                          pdfs: pdfs, // 🔴 2. ส่งข้อมูลของจริงไปหน้า Detail
+                          pdfs: pdfs,
+                          isDarkMode: isDarkMode,
                         );
                       },
                     );
@@ -220,7 +260,9 @@ class _EbookPageState extends State<EbookPage> {
         duration: const Duration(milliseconds: 300), 
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? selectedColor : Colors.white.withOpacity(0.9), 
+          color: isSelected 
+              ? selectedColor 
+              : (isDarkMode ? const Color(0xFF333333) : Colors.white.withOpacity(0.9)), // สลับสีตามโหมด
           borderRadius: BorderRadius.circular(20),
           boxShadow: isSelected 
               ? [BoxShadow(color: selectedColor.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))] 
@@ -232,7 +274,9 @@ class _EbookPageState extends State<EbookPage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: isSelected ? Colors.black87 : Colors.black54,
+              color: isSelected 
+                  ? Colors.black87 
+                  : (isDarkMode ? Colors.white70 : Colors.black54), // สลับสีตัวหนังสือตามโหมด
               fontFamily: 'SF-Pro'
             ),
           ),
@@ -246,7 +290,8 @@ class _EbookPageState extends State<EbookPage> {
     required String code, 
     required String title,
     required String description,   
-    required List<String> pdfs,    
+    required List<String> pdfs,
+    required bool isDarkMode,
   }) {
     return GestureDetector(
       onTap: () {
@@ -257,23 +302,26 @@ class _EbookPageState extends State<EbookPage> {
               courseTitle: title,
               description: description,
               pdfFiles: pdfs,
+              isDarkMode: isDarkMode,
             ),
           ),
         );
       },
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 500),
         margin: const EdgeInsets.only(bottom: 20),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: Colors.white,
+          color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white, // สีการ์ดตามโหมด
           boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 5))],
         ),
         clipBehavior: Clip.antiAlias, 
         child: Column(
           children: [
-            Container(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
               height: 140, 
-              color: const Color(0xFFE2E6EC), 
+              color: isDarkMode ? const Color(0xFF1A1A1A) : const Color(0xFFE2E6EC), // สีพื้นหลังรูป
               child: Stack(
                 children: [
                   const Center(
@@ -296,7 +344,7 @@ class _EbookPageState extends State<EbookPage> {
             ),
             Container(
               padding: const EdgeInsets.all(20),
-              color: const Color(0xFF1E293B), 
+              color: const Color(0xFF1E293B), // สีนี้เข้มอยู่แล้ว เข้ากับทั้ง 2 โหมด
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
