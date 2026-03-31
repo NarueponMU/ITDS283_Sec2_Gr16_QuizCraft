@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart'; // 🔴 Import Storage
+import 'package:image_picker/image_picker.dart'; // 🔴 Import Image Picker
+import 'dart:io';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -19,7 +22,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   bool _isFetching = true;
   String? _photoUrl;
 
-  // 1. เตรียมลิงก์รูป Avatar (ชุดเดียวกับหน้า Profile เลยครับ)
   final List<String> _avatarOptions = [
     'https://api.dicebear.com/7.x/adventurer/png?seed=Felix&backgroundColor=b6e3f4',
     'https://api.dicebear.com/7.x/adventurer/png?seed=Aneka&backgroundColor=ffdfbf',
@@ -60,7 +62,49 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  // 2. ฟังก์ชันเปิดหน้าต่างเลือกรูป Avatar
+  // 🔴 ฟังก์ชันเปิดกล้อง (เหมือนหน้า Profile)
+  Future<void> _takePhoto() async {
+    Navigator.pop(context); 
+    final ImagePicker picker = ImagePicker();
+    final XFile? photo = await picker.pickImage(
+      source: ImageSource.camera, 
+      maxWidth: 500,
+      imageQuality: 80,
+    );
+
+    if (photo != null) {
+      _uploadImageToFirebase(File(photo.path));
+    }
+  }
+
+  // 🔴 ฟังก์ชันอัปโหลดรูปขึ้น Storage
+  Future<void> _uploadImageToFirebase(File imageFile) async {
+    if (currentUser == null) return;
+    setState(() => _isLoading = true);
+    try {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_pictures')
+          .child('${currentUser!.uid}.jpg');
+
+      await storageRef.putFile(imageFile);
+      final String downloadUrl = await storageRef.getDownloadURL();
+
+      setState(() {
+        _photoUrl = downloadUrl; // โชว์เป็นพรีวิวก่อน (ยังไม่เซฟลง Database)
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // 🔴 เพิ่มปุ่มกล้องในหน้าต่างเลือก Avatar
   void _showAvatarPicker() {
     showModalBottomSheet(
       context: context,
@@ -83,6 +127,36 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
               ),
               const SizedBox(height: 20),
+              
+              // 🔴 ปุ่มถ่ายรูป
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text('Take a Photo', style: TextStyle(fontFamily: 'SF-Pro', fontSize: 16)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0053CC),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: _takePhoto,
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16.0),
+                child: Row(
+                  children: [
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 10.0),
+                      child: Text('OR CHOOSE AVATAR', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                    ),
+                    Expanded(child: Divider()),
+                  ],
+                ),
+              ),
+
               Expanded(
                 child: GridView.builder(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -94,9 +168,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   itemBuilder: (context, index) {
                     return GestureDetector(
                       onTap: () {
-                        // แค่จำรูปที่เลือกไว้ โชว์เป็นพรีวิว (ยังไม่เซฟลง Database)
                         setState(() {
-                          _photoUrl = _avatarOptions[index];
+                          _photoUrl = _avatarOptions[index]; // พรีวิวรูป
                         });
                         Navigator.pop(context);
                       },
@@ -121,7 +194,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     setState(() => _isLoading = true);
 
     try {
-      // 3. รวบรวมข้อมูลที่แก้ไข (รวมถึงรูปที่เลือกใหม่ด้วย)
       Map<String, dynamic> updateData = {};
 
       if (_nameController.text.isNotEmpty) {
@@ -131,7 +203,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         updateData['photoUrl'] = _photoUrl;
       }
 
-      // สั่งอัปเดตลง Database ทีเดียวเลย
+      // บันทึกข้อมูลที่แก้ไขลง Firestore
       if (updateData.isNotEmpty) {
         await FirebaseFirestore.instance
             .collection('users')
@@ -139,6 +211,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             .update(updateData);
       }
 
+      // ตรวจสอบการเปลี่ยนรหัสผ่าน
       if (_passwordController.text.isNotEmpty) {
         await currentUser!.updatePassword(_passwordController.text.trim());
       }
@@ -161,10 +234,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
     } on FirebaseAuthException catch (e) {
       String msg = 'An error occurred.';
-      if (e.code == 'weak-password')
+      if (e.code == 'weak-password') {
         msg = 'The password must be at least 6 characters long.';
-      if (e.code == 'requires-recent-login')
+      }
+      if (e.code == 'requires-recent-login') {
         msg = 'Please log out and log back in to change your password.';
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -257,9 +332,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       ),
                       const SizedBox(height: 40),
 
-                      // 4. รูปโปรไฟล์ที่กดเพื่อเลือกใหม่ได้
                       GestureDetector(
-                        onTap: _showAvatarPicker, // กดแล้วเด้งหน้าต่างเลือกรูป
+                        onTap: _showAvatarPicker,
                         child: Stack(
                           children: [
                             Container(
@@ -289,9 +363,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               child: Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFF1B6DF9,
-                                  ), // สีน้ำเงินให้รู้ว่าเป็นปุ่ม
+                                  color: const Color(0xFF1B6DF9), 
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: Colors.white,
@@ -302,7 +374,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   Icons.edit,
                                   color: Colors.white,
                                   size: 16,
-                                ), // ไอคอนรูปดินสอ
+                                ), 
                               ),
                             ),
                           ],
@@ -420,7 +492,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
           fontFamily: 'SF-Pro',
           color: readOnly ? Colors.grey[600] : Colors.black87,
         ),
-        // สั่งให้เมื่อพิมพ์ข้อความในช่องชื่อ ให้มันอัปเดตข้อความตรงใต้รูปโปรไฟล์แบบ Real-time ด้วย
         onChanged: (value) {
           if (hintText == 'FULL NAME') {
             setState(() {});

@@ -47,7 +47,7 @@ class LogoutPage extends StatelessWidget {
                     Icon(
                       Icons.arrow_forward,
                       size: 160,
-                      color: Color(0xFFFF1100), // สีดำอมเทาเข้มๆ ตามดีไซน์
+                      color: Color(0xFFFF1100), // สีแดง
                     ),
                     SizedBox(height: 30),
                     Text(
@@ -74,16 +74,21 @@ class LogoutPage extends StatelessWidget {
                 // 3. ส่วนปุ่มกดด้านล่าง (Leave & Cancel)
                 Row(
                   children: [
-                    // ปุ่ม LEAVE (สีแดง)
+                    // 🔴 ปุ่ม LEAVE (สีแดง)
                     Expanded(
                       child: GestureDetector(
-                        onTap: () {
-                          // คำสั่งล้างประวัติหน้าจอทั้งหมด แล้วพาไปหน้า SignIn
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(builder: (context) => const SignInPage()),
-                            (Route<dynamic> route) => false, // ลบ History ทิ้งทั้งหมด กด Back กลับมาไม่ได้
-                          );
+                        onTap: () async {
+                          // 1. สั่งเตะผู้ใช้ออกจากระบบ Firebase 
+                          await FirebaseAuth.instance.signOut();
+                          
+                          // 2. เด้งกลับไปหน้า SignIn และล้างประวัติหน้าจอทั้งหมด
+                          if (context.mounted) {
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(builder: (context) => const SignInPage()),
+                              (Route<dynamic> route) => false,
+                            );
+                          }
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 20),
@@ -107,20 +112,12 @@ class LogoutPage extends StatelessWidget {
                     ),
                     const SizedBox(width: 16),
                     
-                    // ปุ่ม CANCEL (สีน้ำเงินเข้ม)
+                    // 🔴 ปุ่ม CANCEL (สีน้ำเงินเข้ม)
                     Expanded(
                       child: GestureDetector(
-                        onTap: () async{
-                          // 1. สั่งเตะผู้ใช้ออกจากระบบ Firebase
-                          await FirebaseAuth.instance.signOut();
-                          // 2. เด้งกลับไปหน้า SignIn และล้างประวัติหน้าจอทั้งหมด
-                          if (context.mounted) {
-                            Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(builder: (context) => const SignInPage()),
-                              (Route<dynamic> route) => false,
-                            );
-                          }
+                        onTap: () {
+                          // แค่กดปิดหน้านี้ (Pop) กลับไปหน้า Profile ก็พอครับ
+                          Navigator.pop(context);
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 20),
