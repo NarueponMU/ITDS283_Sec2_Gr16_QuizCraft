@@ -182,7 +182,7 @@ class _QuizPageState extends State<QuizPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(questions[currentQuestionIndex]['questionText'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 18, fontFamily: 'SF-Pro', height: 1.5)),
+                          Text(questions[currentQuestionIndex]['questionText'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 20, fontFamily: 'SF-Pro', height: 1.5)),
                           const SizedBox(height: 24),
 
                           ...List.generate(
@@ -312,7 +312,7 @@ class _QuizPageState extends State<QuizPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(child: Text(text, style: const TextStyle(color: Colors.black, fontSize: 16, fontFamily: 'SF-Pro', fontWeight: FontWeight.w500))),
+            Expanded(child: Text(text, style: const TextStyle(color: Colors.black, fontSize: 16, fontFamily: 'SF-Pro', fontWeight: FontWeight.normal))),
             if (hasAnsweredCurrent && index == correctIndex) const Icon(Icons.check_circle, color: Colors.green)
             else if (hasAnsweredCurrent && index == currentSelected && index != correctIndex) const Icon(Icons.cancel, color: Colors.red),
           ],
