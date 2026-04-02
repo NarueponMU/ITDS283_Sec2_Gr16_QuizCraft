@@ -38,4 +38,4 @@ flutter:
         - asset: assets/fonts/SF-Pro-Rounded-Light.otf
         - asset: assets/fonts/SF-Pro-Rounded-Heavy.otf
   assets: 
-        - assets/images/Toy.jpg
+        - assets/images/logo.png
