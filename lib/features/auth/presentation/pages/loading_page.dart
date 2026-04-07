@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // 1. Import Firebase Auth
+import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'sign_in_page.dart';
-import '../../../main/presentation/pages/main_screen.dart'; // 2. Import หน้า MainScreen
 
 class LoadingPage extends StatefulWidget {
   const LoadingPage({super.key});
