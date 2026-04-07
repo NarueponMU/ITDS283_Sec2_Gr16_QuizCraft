@@ -15,6 +15,9 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
   String? _selectedSubjectId;
   bool _isLoadingSubjects = true;
 
+  // เพิ่มตัวแปรเก็บ Future เพื่อไม่ให้โหลด Firebase ซ้ำๆ เวลากระตุก
+  Future<Map<String, dynamic>>? _courseDataFuture;
+
   @override
   void initState() {
     super.initState();
@@ -35,7 +38,11 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
           _subjects = subs;
           _selectedSubjectId = subs.first['id']; 
           _isLoadingSubjects = false;
+          // เรียกโหลดข้อมูลข้อสอบครั้งแรก หลังจากได้วิชาเริ่มต้นแล้ว
+          _courseDataFuture = _fetchCourseData();
         });
+      } else {
+        setState(() => _isLoadingSubjects = false);
       }
     } catch (e) {
       setState(() => _isLoadingSubjects = false);
@@ -111,13 +118,10 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
       }
     }
 
-    // 🔴 ท่อนที่เพิ่มเข้าไปเพื่อแก้ปัญหากราฟล่องหน
     if (totalAttempts == 0) {
       scoreSpots = [const FlSpot(0, 0), const FlSpot(1, 0)];
       avgSpots = [const FlSpot(0, 0), const FlSpot(1, 0)];
     } else if (totalAttempts == 1) {
-      // 🌟 ถ้าทำข้อสอบไปแค่ 1 ครั้ง ให้ก๊อปปี้จุดเดิมเพิ่มไปอีกจุด
-      // เพื่อให้กราฟมี 2 จุดสำหรับลากเป็นเส้นตรง (ไม่งั้นมันจะไม่วาดเส้นให้)
       scoreSpots.add(FlSpot(1, scoreSpots[0].y));
       avgSpots.add(FlSpot(1, avgSpots[0].y));
     }
@@ -160,9 +164,9 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
           child: _isLoadingSubjects 
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
           : FutureBuilder<Map<String, dynamic>>(
-            future: _fetchCourseData(),
+            future: _courseDataFuture, // เปลี่ยนมาเรียกใช้ตัวแปร Future ที่ล็อคค่าไว้แล้ว
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator(color: Colors.white));
               }
 
@@ -181,7 +185,6 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                   crossAxisAlignment: CrossAxisAlignment.center, 
                   children: [
                     const SizedBox(height: 20),
-                    // 1. Header 
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -208,7 +211,6 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // 2. Search Bar
                     Container(
                       width: double.infinity,
                       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
@@ -225,7 +227,9 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                         },
                         onSelected: (Map<String, dynamic> selection) {
                           setState(() {
-                            _selectedSubjectId = selection['id']; 
+                            _selectedSubjectId = selection['id'];
+                            // โหลด Future ใหม่เฉพาะตอนที่ผู้ใช้กดเลือกวิชาใหม่เท่านั้น
+                            _courseDataFuture = _fetchCourseData();
                           });
                         },
                         fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
@@ -275,7 +279,6 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 3. Course Name Display 
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -291,7 +294,6 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 4. Main White Container 
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -299,7 +301,6 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 4.1 Grid 2x2 Stat Cards
                           Row(
                             children: [
                               Expanded(child: _buildStatCard('Total\nAttempts', '$totalAttempts', '', Icons.replay_circle_filled_rounded, const Color(0xFFF96D52))), 
@@ -317,7 +318,6 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                           ),
                           const SizedBox(height: 24), 
 
-                          // 4.2 Course Process Section 
                           const Text('Course Process', style: TextStyle(color: Color(0xFFFF9500), fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
                           const SizedBox(height: 16),
                           
@@ -339,11 +339,13 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                           ),
                           const SizedBox(height: 30),
 
-                          // 4.3 Line Chart Area
                           SizedBox(
                             height: 180,
                             child: LineChart(
                               LineChartData(
+                                // ล็อคแกน Y ไว้ที่ 0-100 สเกลจะได้คงที่สวยงาม
+                                minY: 0,
+                                maxY: 100,
                                 gridData: FlGridData(
                                   show: true,
                                   drawVerticalLine: false,
@@ -364,7 +366,7 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                                     color: const Color(0xFF8F70FF),
                                     barWidth: 3,
                                     isStrokeCapRound: true,
-                                    dotData: const FlDotData(show: false),
+                                    dotData: const FlDotData(show: true), // เปิดจุดให้กราฟดูมีมิติ
                                     belowBarData: BarAreaData(show: false),
                                   ),
                                   LineChartBarData(
@@ -373,7 +375,7 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                                     color: const Color(0xFFF96D52),
                                     barWidth: 3,
                                     isStrokeCapRound: true,
-                                    dotData: const FlDotData(show: false),
+                                    dotData: const FlDotData(show: true), // เปิดจุดให้กราฟดูมีมิติ
                                     belowBarData: BarAreaData(show: false),
                                   ),
                                 ],
@@ -382,7 +384,6 @@ class _CourseAnalysisPageState extends State<CourseAnalysisPage> {
                           ),
                           const SizedBox(height: 16),
 
-                          // 4.4 Legend 
                           Row(
                             mainAxisAlignment: MainAxisAlignment.start,
                             children: [

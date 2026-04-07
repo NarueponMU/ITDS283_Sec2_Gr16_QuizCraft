@@ -3,18 +3,31 @@ import 'ebook_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   final VoidCallback? onStartQuiz;
-
   const HomePage({super.key, this.onStartQuiz});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  // 1. สร้างตัวแปรเก็บ Future ไว้เพื่อไม่ให้โหลดซ้ำซ้อน
+  late Future<List<Map<String, dynamic>>> _progressFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // 2. โหลดข้อมูลแค่ครั้งเดียวตอนเปิดหน้า
+    _progressFuture = _calculateProgress();
+  }
 
   Future<List<Map<String, dynamic>>> _calculateProgress() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
 
+    // ดึงข้อมูลวิชาและคะแนน
     final subjectsSnap = await FirebaseFirestore.instance.collection('subjects').get();
-    final subjects = subjectsSnap.docs;
-
     final scoresSnap = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -38,7 +51,7 @@ class HomePage extends StatelessWidget {
     ];
 
     int colorIndex = 0;
-    for (var subj in subjects) {
+    for (var subj in subjectsSnap.docs) {
       String subjId = subj.id;
       String subjCode = subj['code'];
       String subjName = subj['name'] ?? '';
@@ -49,13 +62,12 @@ class HomePage extends StatelessWidget {
 
       progressData.add({
         'code': subjCode,
-        'name': subjName, // 🔴 แยกเก็บชื่อวิชาต่างหาก
+        'name': subjName,
         'progress': progress,
         'colors': colors[colorIndex % colors.length]
       });
       colorIndex++;
     }
-
     return progressData;
   }
 
@@ -79,6 +91,7 @@ class HomePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -105,6 +118,7 @@ class HomePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
 
+                // SDG 4 Card
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
@@ -120,8 +134,9 @@ class HomePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
 
+                // Start Quiz Button
                 GestureDetector(
-                  onTap: onStartQuiz,
+                  onTap: widget.onStartQuiz,
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
                     decoration: BoxDecoration(color: const Color(0xFFF2F5F8), borderRadius: BorderRadius.circular(20)),
@@ -152,17 +167,17 @@ class HomePage extends StatelessWidget {
                 const Text('Your Progress', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
                 const SizedBox(height: 16),
                 
+                // Progress Section
                 FutureBuilder<List<Map<String, dynamic>>>(
-                  future: _calculateProgress(),
+                  future: _progressFuture, // ใช้ตัวแปร Future ที่โหลดไว้แล้ว
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return Container(
-                        padding: const EdgeInsets.all(40),
+                        height: 200,
                         decoration: BoxDecoration(color: const Color(0xFFF2F5F8), borderRadius: BorderRadius.circular(20)),
                         child: const Center(child: CircularProgressIndicator()),
                       );
                     }
-
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
                       return Container(
                         padding: const EdgeInsets.all(20),
@@ -171,14 +186,11 @@ class HomePage extends StatelessWidget {
                       );
                     }
 
-                    final progressList = snapshot.data!;
-
                     return Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(color: const Color(0xFFF2F5F8), borderRadius: BorderRadius.circular(20)),
                       child: Column(
-                        children: progressList.map((data) {
-                          // 🔴 โยนรหัสวิชา และ ชื่อวิชา แยกกันเข้าไป
+                        children: snapshot.data!.map((data) {
                           return _buildGradientProgressRow(
                             data['code'],
                             data['name'], 
@@ -192,12 +204,11 @@ class HomePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
 
+                // E-Book Button
                 const Text('Course', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
                 const SizedBox(height: 16),
                 GestureDetector(
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const EbookPage()));
-                  },
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const EbookPage())),
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 24),
@@ -220,28 +231,16 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // 🔴 ปรับ Layout ใหม่หมดให้เป็น 3 ชั้น (รหัสวิชา -> ชื่อวิชา -> หลอด+เลข%)
   Widget _buildGradientProgressRow(String code, String name, double progress, List<Color> gradientColors) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 22.0), // เพิ่มระยะห่างระหว่างวิชาให้อ่านง่าย
+      padding: const EdgeInsets.only(bottom: 22.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. รหัสวิชา
-          Text(
-            code, 
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1B6DF9), fontFamily: 'SF-Pro')
-          ),
+          Text(code, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1B6DF9), fontFamily: 'SF-Pro')),
           const SizedBox(height: 2),
-          // 2. ชื่อวิชาเต็ม (ถ้าเกินจะตัดเป็น ... สวยๆ)
-          Text(
-            name, 
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black54, fontFamily: 'SF-Pro'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black54, fontFamily: 'SF-Pro'), maxLines: 1, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 10),
-          // 3. หลอด Progress และตัวเลข % ให้อยู่บรรทัดเดียวกัน
           Row(
             children: [
               Expanded(
@@ -249,11 +248,11 @@ class HomePage extends StatelessWidget {
                   builder: (context, constraints) {
                     return Container(
                       height: 10,
-                      width: constraints.maxWidth, 
                       decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: Container(
+                        child: AnimatedContainer( // เพิ่ม Animation นิดๆ ให้หลอดขยับสวยๆ
+                          duration: const Duration(milliseconds: 500),
                           width: constraints.maxWidth * progress, 
                           decoration: BoxDecoration(
                             gradient: LinearGradient(colors: gradientColors), 
@@ -266,10 +265,7 @@ class HomePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              Text(
-                '${(progress * 100).toInt()}%', 
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87, fontFamily: 'SF-Pro')
-              ),
+              Text('${(progress * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87, fontFamily: 'SF-Pro')),
             ],
           ),
         ],

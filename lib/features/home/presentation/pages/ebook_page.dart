@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shake/shake.dart'; // 🔴 1. Import แพ็กเกจ shake
+import 'package:shake/shake.dart'; // Import แพ็กเกจ shake
 import 'ebook_detail_page.dart';
 
 class EbookPage extends StatefulWidget {
@@ -17,7 +17,7 @@ class _EbookPageState extends State<EbookPage> {
 
   late Stream<QuerySnapshot> _subjectStream;
 
-  // 🔴 2. ตัวแปรสำหรับ Dark Mode และตัวจับการเขย่า
+  // ตัวแปรสำหรับ Dark Mode และตัวจับการเขย่า
   bool isDarkMode = false;
   ShakeDetector? detector;
 
@@ -55,7 +55,7 @@ class _EbookPageState extends State<EbookPage> {
   @override
   void dispose() {
     _searchController.dispose();
-    detector?.stopListening(); // 🔴 4. ปิดเซ็นเซอร์เมื่อออกจากหน้านี้ (ประหยัดแบต)
+    detector?.stopListening(); // ปิดเซ็นเซอร์เมื่อออกจากหน้านี้ (ประหยัดแบต)
     super.dispose();
   }
 
@@ -72,7 +72,7 @@ class _EbookPageState extends State<EbookPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔴 กำหนดสีพื้นหลังหลักตามโหมด
+    // กำหนดสีพื้นหลังหลักตามโหมด
     final bgColors = isDarkMode 
         ? [const Color(0xFF121212), const Color(0xFF1E1E1E), const Color(0xFF2C2C2C)] // สี Dark Mode
         : [const Color(0xFF003E99), const Color(0xFF0053CC), const Color(0xFF227CFF)]; // สี Light Mode (น้ำเงินเดิม)
@@ -104,7 +104,7 @@ class _EbookPageState extends State<EbookPage> {
                     ),
                     Expanded(
                       child: Center(
-                        // 🔴 ใช้ GestureDetector มาครอบ Text เพื่อทำปุ่มลัดจำลองการเขย่า
+                        // ใช้ GestureDetector มาครอบ Text เพื่อทำปุ่มลัดจำลองการเขย่า
                         child: GestureDetector(
                           onLongPress: () {
                             setState(() {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// นำเข้า http และ dart:convert สำหรับยิง API ImgBB
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart'; 
@@ -42,25 +41,22 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     if (photo != null) {
-      _uploadImageToImgBB(File(photo.path)); // 🔴 เรียกใช้ฟังก์ชัน ImgBB
+      _uploadImageToImgBB(File(photo.path));
     }
   }
 
-  // 🔴 ฟังก์ชันอัปโหลดรูปขึ้น ImgBB
+  // ฟังก์ชันอัปโหลดรูปขึ้น ImgBB (Remote API Feature)
   Future<void> _uploadImageToImgBB(File imageFile) async {
     if (currentUser == null) return;
 
     setState(() => _isLoading = true);
     try {
-      // 1. แปลงไฟล์รูปภาพเป็น Base64
       List<int> imageBytes = await imageFile.readAsBytes();
       String base64Image = base64Encode(imageBytes);
 
-      // 2. ใช้ API Key ที่คุณให้มา
       const String apiKey = 'cd1ea9c634a5867f69baa903e355d48e';
       final Uri url = Uri.parse('https://api.imgbb.com/1/upload');
 
-      // 3. ยิง API อัปโหลดรูป
       final response = await http.post(url, body: {
         'key': apiKey,
         'image': base64Image,
@@ -68,9 +64,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
-        final String imageUrl = responseData['data']['url']; // ได้ URL รูปมาแล้ว!
+        final String imageUrl = responseData['data']['url'];
 
-        // 4. บันทึกลิงก์ URL ลงใน Firestore
         await FirebaseFirestore.instance
             .collection('users')
             .doc(currentUser!.uid)
@@ -79,20 +74,19 @@ class _ProfilePageState extends State<ProfilePage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Photo taken and profile uploaded successfully.', style: TextStyle(fontFamily: 'SF-Pro')),
+              content: Text('📸 Profile picture updated via ImgBB!', style: TextStyle(fontFamily: 'SF-Pro')),
               backgroundColor: Colors.green,
             ),
           );
         }
       } else {
-        throw Exception('Failed to upload image');
+        throw Exception('Upload failed');
       }
     } catch (e) {
-      print('🚨 ImgBB Error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('An error occurred while uploading the image to ImgBB.', style: TextStyle(fontFamily: 'SF-Pro')),
+            content: Text('Error uploading image. Please try again.'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -102,6 +96,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  // ฟังก์ชันอัปเดตรูปจาก Avatar 
   Future<void> _updateAvatar(String selectedUrl) async {
     if (currentUser == null) return;
     setState(() => _isLoading = true);
@@ -110,8 +105,18 @@ class _ProfilePageState extends State<ProfilePage> {
           .collection('users')
           .doc(currentUser!.uid)
           .update({'photoUrl': selectedUrl});
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Avatar updated successfully!'), backgroundColor: Colors.green),
+        );
+      }
     } catch (e) {
-      // Error handling...
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update avatar'), backgroundColor: Colors.redAccent),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -121,22 +126,21 @@ class _ProfilePageState extends State<ProfilePage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true, // 🌟 เพื่อให้ BottomSheet ขยายตามเนื้อหา
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
+        return Container(
           padding: const EdgeInsets.all(20.0),
+          // จำกัดความสูงไม่ให้ Grid ทะลุขอบจอจนพัง
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
                 'Choose Your Avatar',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'SF-Pro',
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro'),
               ),
               const SizedBox(height: 20),
               
@@ -168,8 +172,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
 
-              Expanded(
+              // ใช้ Flexible + shrinkWrap เพื่อแก้บั๊ก Layout Crash
+              Flexible(
                 child: GridView.builder(
+                  shrinkWrap: true,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 4, 
                     crossAxisSpacing: 10,

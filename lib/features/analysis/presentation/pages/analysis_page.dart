@@ -14,12 +14,10 @@ class AnalysisPage extends StatefulWidget {
 
 class _AnalysisPageState extends State<AnalysisPage> {
 
-  // 🔴 1. ฟังก์ชันคำนวณสถิติจากประวัติการทำข้อสอบ (History)
   Future<Map<String, dynamic>> _fetchAnalysisData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return {};
 
-    // 🌟 ดึงข้อมูลจากคอลเล็กชัน history และเรียงลำดับเวลา (เก่าไปใหม่)
     final historySnap = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -30,7 +28,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
     int totalQuiz = historySnap.docs.length;
     double sumPercentages = 0;
     double maxPercent = 0;
-    double minPercent = 100; // ตั้งค่าเริ่มต้นไว้สูงๆ ก่อน
+    double minPercent = 100; 
     double recentPercent = 0;
     List<FlSpot> userSpots = [];
 
@@ -41,23 +39,26 @@ class _AnalysisPageState extends State<AnalysisPage> {
         int score = data['score'] ?? 0;
         int totalQuestions = data['totalQuestions'] ?? 20;
 
-        // คำนวณเป็นเปอร์เซ็นต์
         double percent = totalQuestions > 0 ? (score / totalQuestions) * 100 : 0;
 
         sumPercentages += percent;
         if (percent > maxPercent) maxPercent = percent;
         if (percent < minPercent) minPercent = percent;
         
-        // ก้อนสุดท้ายในลูปจะกลายเป็น "คะแนนล่าสุด (Recent Score)" อัตโนมัติ
         recentPercent = percent; 
-
-        // สร้างจุดบนกราฟ
         userSpots.add(FlSpot(index.toDouble(), percent));
         index++;
       }
+      
+      // บั๊กกราฟพังถ้ามีข้อมูลแค่ 1 จุด
+      if (userSpots.length == 1) {
+        // ก๊อปปี้จุดเดิมเพิ่มไปข้างหน้า 1 ช่อง เพื่อให้ลากเส้นแนวนอนได้
+        userSpots.add(FlSpot(1, recentPercent));
+      }
+      
     } else {
-      minPercent = 0; // ถ้ายังไม่เคยทำข้อสอบ ให้ต่ำสุดเป็น 0
-      userSpots = [const FlSpot(0, 0), const FlSpot(1, 0)]; // จุดหลอกกันกราฟพัง
+      minPercent = 0; 
+      userSpots = [const FlSpot(0, 0), const FlSpot(1, 0)]; 
     }
 
     double avgPercent = totalQuiz > 0 ? (sumPercentages / totalQuiz) : 0;
@@ -67,7 +68,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
       'avgScore': avgPercent,
       'bestScore': maxPercent,
       'minScore': minPercent,
-      'recentScore': recentPercent, // 🌟 ส่งคะแนนล่าสุดไปให้ UI
+      'recentScore': recentPercent, 
       'userSpots': userSpots,
     };
   }
@@ -94,14 +95,13 @@ class _AnalysisPageState extends State<AnalysisPage> {
                 return const Center(child: CircularProgressIndicator(color: Colors.white));
               }
 
-              // 🌟 2. แกะกล่องข้อมูลที่คำนวณเสร็จแล้วมาใช้งาน
               final data = snapshot.data ?? {};
               final totalQuiz = data['totalQuiz'] ?? 0;
               final avgScore = (data['avgScore'] ?? 0.0).toStringAsFixed(0);
               final bestScore = (data['bestScore'] ?? 0.0).toStringAsFixed(0);
               final minScore = (data['minScore'] ?? 0.0).toStringAsFixed(0);
               final recentScore = (data['recentScore'] ?? 0.0).toStringAsFixed(0); 
-              final List<FlSpot> userSpots = data['userSpots'] ?? [const FlSpot(0, 0)];
+              final List<FlSpot> userSpots = data['userSpots'] ?? [const FlSpot(0, 0), const FlSpot(1, 0)];
 
               return SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -112,16 +112,12 @@ class _AnalysisPageState extends State<AnalysisPage> {
                     const Text('Analysis', style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
                     const SizedBox(height: 24),
 
-                    // Activity Card
                     _buildActivityCard(context, totalQuiz.toString(), avgScore, userSpots),
                     const SizedBox(height: 16),
 
-                    // Courses Card
                     _buildCoursesCard(context, totalQuiz.toString(), avgScore),
                     const SizedBox(height: 16),
 
-                    // Performance Card
-                    // 🌟 ส่ง recentScore ไปโชว์ด้วย
                     _buildPerformanceCard(bestScore, avgScore, recentScore, minScore, userSpots),
 
                     const SizedBox(height: 120),
@@ -135,9 +131,6 @@ class _AnalysisPageState extends State<AnalysisPage> {
     );
   }
 
-  // ---------------------------------------------------------
-  // Widget ย่อยสำหรับ Card ที่ 1: Activity
-  // ---------------------------------------------------------
   Widget _buildActivityCard(BuildContext context, String totalQuiz, String avgScore, List<FlSpot> spots) {
     return GestureDetector(
       onTap: () {
@@ -195,9 +188,6 @@ class _AnalysisPageState extends State<AnalysisPage> {
     );
   }
 
-  // ---------------------------------------------------------
-  // Widget ย่อยสำหรับ Card ที่ 2: Courses
-  // ---------------------------------------------------------
   Widget _buildCoursesCard(BuildContext context, String totalQuiz, String avgScore) { 
     return GestureDetector(
       onTap: () {
@@ -220,10 +210,6 @@ class _AnalysisPageState extends State<AnalysisPage> {
     );
   }
 
-  // ---------------------------------------------------------
-  // Widget ย่อยสำหรับ Card ที่ 3: Performance
-  // ---------------------------------------------------------
-  // 🌟 ปรับให้รับค่า recentScore เข้ามาแสดงผล
   Widget _buildPerformanceCard(String bestScore, String avgScore, String recentScore, String minScore, List<FlSpot> userSpots) {
     return _buildCardTemplate(
       title: 'Performance',
@@ -237,7 +223,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
               _buildVerticalDivider(),
               _buildStatItem('Average Score', avgScore, ' %', Colors.green),
               _buildVerticalDivider(),
-              _buildStatItem('Recent Score', recentScore, ' %', Colors.lightBlue), // 🌟 โชว์คะแนนล่าวสุด
+              _buildStatItem('Recent Score', recentScore, ' %', Colors.lightBlue), 
             ],
           ),
           const SizedBox(height: 24),
@@ -258,20 +244,19 @@ class _AnalysisPageState extends State<AnalysisPage> {
                   border: Border(bottom: BorderSide(color: Colors.grey.shade500, width: 2), left: BorderSide(color: Colors.grey.shade500, width: 2))
                 ),
                 lineBarsData: [
-                  _createLineData(Colors.blue, userSpots),
-                  _createLineData(Colors.purpleAccent, [const FlSpot(0, 20), const FlSpot(1, 40), const FlSpot(2, 30), const FlSpot(3, 70), const FlSpot(4, 50)]),
-                  _createLineData(Colors.green, [const FlSpot(0, 60), const FlSpot(1, 50), const FlSpot(2, 70), const FlSpot(3, 60), const FlSpot(4, 90)]),
-                  _createLineData(Colors.orange, [const FlSpot(0, 30), const FlSpot(1, 20), const FlSpot(2, 40), const FlSpot(3, 10), const FlSpot(4, 30)]),
+                  // โชว์แค่เส้นคะแนนจริงของผู้ใช้งาน เพื่อความสมจริง (เอาเส้นหลอกๆ ออก)
+                  _createLineData(const Color(0xFF1B6DF9), userSpots),
                 ],
               ),
             ),
           ),
 
           const SizedBox(height: 20),
-          _buildLegendItem(Colors.purpleAccent, 'Improvement Score', '$bestScore%'),
-          _buildLegendItem(Colors.blue, 'Average Score', '$avgScore%'),
-          _buildLegendItem(Colors.green, 'Highest Score', bestScore),
-          _buildLegendItem(Colors.redAccent, 'Lowest Score', minScore),
+          // แก้ไข: ปรับแก้ Legend ให้ข้อความ ตัวแปร และ % ถูกต้องตรงกับกราฟและสถิติ
+          _buildLegendItem(const Color(0xFF1B6DF9), 'Your Score Trend', 'Actual'),
+          _buildLegendItem(Colors.green, 'Highest Score', '$bestScore%'),
+          _buildLegendItem(Colors.blueGrey, 'Average Score', '$avgScore%'),
+          _buildLegendItem(Colors.redAccent, 'Lowest Score', '$minScore%'),
         ],
       ),
     );
@@ -284,14 +269,14 @@ class _AnalysisPageState extends State<AnalysisPage> {
       color: color,
       barWidth: 2.5,
       isStrokeCapRound: true,
-      dotData: const FlDotData(show: false),
-      belowBarData: BarAreaData(show: false),
+      dotData: const FlDotData(show: true), // เปิดให้เห็นจุดบนกราฟ จะได้ดูออกว่าทำไปกี่ครั้ง
+      belowBarData: BarAreaData(
+        show: true,
+        color: color.withOpacity(0.2), // เพิ่มเงาสีใต้กราฟให้ดูสวยขึ้น
+      ),
     );
   }
 
-  // ---------------------------------------------------------
-  // Helper Widgets 
-  // ---------------------------------------------------------
   Widget _buildCardTemplate({required String title, required Widget child, bool showArrow = true}) {
     return Container(
       padding: const EdgeInsets.all(20),

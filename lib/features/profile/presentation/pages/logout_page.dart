@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-//สำคัญ: Path ของหน้า SignInPage 
-import 'package:quizcraft/features/auth/presentation/pages/sign_in_page.dart'; 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:quizcraft/features/auth/presentation/pages/sign_in_page.dart'; 
 
 class LogoutPage extends StatelessWidget {
   const LogoutPage({super.key});
@@ -9,7 +8,7 @@ class LogoutPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent, // ให้ทะลุเห็นพื้นหลัง
+      backgroundColor: Colors.transparent, 
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -28,9 +27,8 @@ class LogoutPage extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 40.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween, // กระจายบน-กลาง-ล่าง ให้สมดุล
+              mainAxisAlignment: MainAxisAlignment.spaceBetween, 
               children: [
-                // 1. ส่วนหัวข้อ
                 const Text(
                   'Log Out',
                   style: TextStyle(
@@ -41,16 +39,16 @@ class LogoutPage extends StatelessWidget {
                   ),
                 ),
 
-                // 2. ส่วนตรงกลาง (ลูกศร + ข้อความยืนยัน)
-                const Column(
+                Column(
                   children: [
-                    Icon(
-                      Icons.arrow_forward,
-                      size: 160,
-                      color: Color(0xFFFF1100), // สีแดง
+                    // เปลี่ยนไอคอนให้สื่อความหมายถึงการออกจากระบบมากขึ้น
+                    const Icon(
+                      Icons.logout_rounded, 
+                      size: 140,
+                      color: Color(0xFFFF5252), 
                     ),
-                    SizedBox(height: 30),
-                    Text(
+                    const SizedBox(height: 30),
+                    const Text(
                       'Log out confirmation',
                       style: TextStyle(
                         color: Colors.white,
@@ -59,11 +57,11 @@ class LogoutPage extends StatelessWidget {
                         fontFamily: 'SF-Pro',
                       ),
                     ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Are you sure you wanna log out?',
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Are you sure you want to log out?',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Colors.white70,
                         fontSize: 16,
                         fontFamily: 'SF-Pro',
                       ),
@@ -71,17 +69,13 @@ class LogoutPage extends StatelessWidget {
                   ],
                 ),
 
-                // 3. ส่วนปุ่มกดด้านล่าง (Leave & Cancel)
                 Row(
                   children: [
-                    // 🔴 ปุ่ม LEAVE (สีแดง)
+                    // ปุ่ม LEAVE
                     Expanded(
-                      child: GestureDetector(
+                      child: InkWell( // เปลี่ยนเป็น InkWell เพื่อให้มีเอฟเฟกต์ตอนกด
                         onTap: () async {
-                          // 1. สั่งเตะผู้ใช้ออกจากระบบ Firebase 
                           await FirebaseAuth.instance.signOut();
-                          
-                          // 2. เด้งกลับไปหน้า SignIn และล้างประวัติหน้าจอทั้งหมด
                           if (context.mounted) {
                             Navigator.pushAndRemoveUntil(
                               context,
@@ -90,11 +84,19 @@ class LogoutPage extends StatelessWidget {
                             );
                           }
                         },
+                        borderRadius: BorderRadius.circular(15),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF3B30), // สีแดง
-                            borderRadius: BorderRadius.circular(12),
+                            color: const Color(0xFFFF3B30),
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              )
+                            ],
                           ),
                           child: const Center(
                             child: Text(
@@ -102,7 +104,7 @@ class LogoutPage extends StatelessWidget {
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: 1.5,
+                                letterSpacing: 1.2,
                                 fontFamily: 'SF-Pro',
                               ),
                             ),
@@ -112,18 +114,17 @@ class LogoutPage extends StatelessWidget {
                     ),
                     const SizedBox(width: 16),
                     
-                    // 🔴 ปุ่ม CANCEL (สีน้ำเงินเข้ม)
+                    // ปุ่ม CANCEL
                     Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          // แค่กดปิดหน้านี้ (Pop) กลับไปหน้า Profile ก็พอครับ
-                          Navigator.pop(context);
-                        },
+                      child: InkWell(
+                        onTap: () => Navigator.pop(context),
+                        borderRadius: BorderRadius.circular(15),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF003380), // สีน้ำเงินเข้ม
-                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white.withOpacity(0.15), // ปรับสีให้ดูเป็นปุ่มรอง (Secondary)
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: Colors.white24),
                           ),
                           child: const Center(
                             child: Text(
@@ -131,7 +132,7 @@ class LogoutPage extends StatelessWidget {
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: 1.5,
+                                letterSpacing: 1.2,
                                 fontFamily: 'SF-Pro',
                               ),
                             ),
