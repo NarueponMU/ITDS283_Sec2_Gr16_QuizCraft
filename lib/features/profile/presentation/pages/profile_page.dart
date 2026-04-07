@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // 🔴 1. Import Storage
-import 'package:image_picker/image_picker.dart'; // 🔴 2. Import Image Picker
+// นำเข้า http และ dart:convert สำหรับยิง API ImgBB
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart'; 
 import 'dart:io';
 import 'edit_profile_page.dart';
 import 'logout_page.dart';
@@ -29,60 +31,68 @@ class _ProfilePageState extends State<ProfilePage> {
     'https://api.dicebear.com/7.x/bottts/png?seed=Robot2&backgroundColor=d1d4f9',
   ];
 
-  // 🔴 3. ฟังก์ชันสำหรับเปิดกล้องถ่ายรูป
   Future<void> _takePhoto() async {
-    Navigator.pop(context); // ปิดหน้าต่าง Pop-up ก่อน
+    Navigator.pop(context); 
     
     final ImagePicker picker = ImagePicker();
-    // เรียกใช้ Camera Sensor
     final XFile? photo = await picker.pickImage(
-      source: ImageSource.camera, // เลือกเปิดกล้อง
-      maxWidth: 500, // ย่อขนาดรูปลงหน่อย จะได้อัปโหลดไวๆ
+      source: ImageSource.camera, 
+      maxWidth: 500, 
       imageQuality: 80,
     );
 
     if (photo != null) {
-      _uploadImageToFirebase(File(photo.path));
+      _uploadImageToImgBB(File(photo.path)); // 🔴 เรียกใช้ฟังก์ชัน ImgBB
     }
   }
 
-  // 🔴 4. ฟังก์ชันอัปโหลดรูปที่ถ่ายขึ้น Firebase Storage
-  Future<void> _uploadImageToFirebase(File imageFile) async {
+  // 🔴 ฟังก์ชันอัปโหลดรูปขึ้น ImgBB
+  Future<void> _uploadImageToImgBB(File imageFile) async {
     if (currentUser == null) return;
 
     setState(() => _isLoading = true);
     try {
-      // สร้างที่เก็บรูปใน Storage: profile_pictures/uid.jpg
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_pictures')
-          .child('${currentUser!.uid}.jpg');
+      // 1. แปลงไฟล์รูปภาพเป็น Base64
+      List<int> imageBytes = await imageFile.readAsBytes();
+      String base64Image = base64Encode(imageBytes);
 
-      // อัปโหลดไฟล์
-      await storageRef.putFile(imageFile);
-      
-      // ดึงลิงก์ URL รูปที่อัปโหลดเสร็จแล้ว
-      final String downloadUrl = await storageRef.getDownloadURL();
+      // 2. ใช้ API Key ที่คุณให้มา
+      const String apiKey = 'cd1ea9c634a5867f69baa903e355d48e';
+      final Uri url = Uri.parse('https://api.imgbb.com/1/upload');
 
-      // บันทึกลิงก์ URL ลงใน Firestore เหมือนรูป Avatar ปกติ
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser!.uid)
-          .update({'photoUrl': downloadUrl});
+      // 3. ยิง API อัปโหลดรูป
+      final response = await http.post(url, body: {
+        'key': apiKey,
+        'image': base64Image,
+      });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('📸 ถ่ายรูปโปรไฟล์สำเร็จ!', style: TextStyle(fontFamily: 'SF-Pro')),
-            backgroundColor: Colors.green,
-          ),
-        );
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        final String imageUrl = responseData['data']['url']; // ได้ URL รูปมาแล้ว!
+
+        // 4. บันทึกลิงก์ URL ลงใน Firestore
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser!.uid)
+            .update({'photoUrl': imageUrl});
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Photo taken and profile uploaded successfully.', style: TextStyle(fontFamily: 'SF-Pro')),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to upload image');
       }
     } catch (e) {
+      print('🚨 ImgBB Error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('เกิดข้อผิดพลาดในการอัปโหลดรูป', style: TextStyle(fontFamily: 'SF-Pro')),
+            content: Text('An error occurred while uploading the image to ImgBB.', style: TextStyle(fontFamily: 'SF-Pro')),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -92,7 +102,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // ฟังก์ชันอัปเดตลิงก์รูป Avatar (ของเดิม)
   Future<void> _updateAvatar(String selectedUrl) async {
     if (currentUser == null) return;
     setState(() => _isLoading = true);
@@ -108,7 +117,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // 🔴 5. ปรับหน้าต่างเลือกรูป ให้มีปุ่มกล้องด้วย
   void _showAvatarPicker() {
     showModalBottomSheet(
       context: context,
@@ -132,7 +140,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 20),
               
-              // 🔴 ปุ่มถ่ายรูปจากกล้อง
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -144,7 +151,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  onPressed: _takePhoto, // เรียกฟังก์ชันเปิดกล้อง
+                  onPressed: _takePhoto, 
                 ),
               ),
               const Padding(
@@ -161,7 +168,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
 
-              // ตารางรูป Avatar (ของเดิม)
               Expanded(
                 child: GridView.builder(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -223,7 +229,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 30),
 
                 if (currentUser != null)
-                  StreamBuilder<DocumentSnapshot>( // 🔴 6. เปลี่ยน FutureBuilder เป็น StreamBuilder เพื่อให้รูปเปลี่ยนทันทีออโต้!
+                  StreamBuilder<DocumentSnapshot>( 
                     stream: FirebaseFirestore.instance
                         .collection('users')
                         .doc(currentUser!.uid)
