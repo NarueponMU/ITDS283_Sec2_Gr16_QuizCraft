@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // 🔴 Import Storage
-import 'package:image_picker/image_picker.dart'; // 🔴 Import Image Picker
+// นำเข้า http และ dart:convert สำหรับยิง API ImgBB
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart'; 
 import 'dart:io';
 
 class EditProfilePage extends StatefulWidget {
@@ -62,7 +64,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  // 🔴 ฟังก์ชันเปิดกล้อง (เหมือนหน้า Profile)
   Future<void> _takePhoto() async {
     Navigator.pop(context); 
     final ImagePicker picker = ImagePicker();
@@ -73,30 +74,44 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
 
     if (photo != null) {
-      _uploadImageToFirebase(File(photo.path));
+      _uploadImageToImgBB(File(photo.path)); //เรียกฟังก์ชันอัปโหลดไป ImgBB
     }
   }
 
-  // 🔴 ฟังก์ชันอัปโหลดรูปขึ้น Storage
-  Future<void> _uploadImageToFirebase(File imageFile) async {
-    if (currentUser == null) return;
+  // ฟังก์ชันอัปโหลดรูปขึ้น ImgBB สำหรับหน้า Edit
+  Future<void> _uploadImageToImgBB(File imageFile) async {
     setState(() => _isLoading = true);
+
     try {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_pictures')
-          .child('${currentUser!.uid}.jpg');
+      List<int> imageBytes = await imageFile.readAsBytes();
+      String base64Image = base64Encode(imageBytes);
 
-      await storageRef.putFile(imageFile);
-      final String downloadUrl = await storageRef.getDownloadURL();
+      const String apiKey = 'cd1ea9c634a5867f69baa903e355d48e';
+      final Uri url = Uri.parse('https://api.imgbb.com/1/upload');
 
-      setState(() {
-        _photoUrl = downloadUrl; // โชว์เป็นพรีวิวก่อน (ยังไม่เซฟลง Database)
+      final response = await http.post(url, body: {
+        'key': apiKey,
+        'image': base64Image,
       });
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        final String imageUrl = responseData['data']['url'];
+
+        setState(() {
+          _photoUrl = imageUrl; // พรีวิวรูปก่อน (ยังไม่เซฟลง Database จนกว่าจะกด Save)
+        });
+      } else {
+        throw Exception('Failed to upload image');
+      }
     } catch (e) {
+      print('🚨 ImgBB Error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ')),
+          const SnackBar(
+            content: Text('An error occurred while uploading the image to ImgBB.', style: TextStyle(fontFamily: 'SF-Pro')),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
@@ -104,7 +119,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  // 🔴 เพิ่มปุ่มกล้องในหน้าต่างเลือก Avatar
   void _showAvatarPicker() {
     showModalBottomSheet(
       context: context,
@@ -128,7 +142,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ),
               const SizedBox(height: 20),
               
-              // 🔴 ปุ่มถ่ายรูป
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -169,7 +182,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     return GestureDetector(
                       onTap: () {
                         setState(() {
-                          _photoUrl = _avatarOptions[index]; // พรีวิวรูป
+                          _photoUrl = _avatarOptions[index]; 
                         });
                         Navigator.pop(context);
                       },
@@ -203,7 +216,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         updateData['photoUrl'] = _photoUrl;
       }
 
-      // บันทึกข้อมูลที่แก้ไขลง Firestore
       if (updateData.isNotEmpty) {
         await FirebaseFirestore.instance
             .collection('users')
@@ -211,7 +223,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
             .update(updateData);
       }
 
-      // ตรวจสอบการเปลี่ยนรหัสผ่าน
       if (_passwordController.text.isNotEmpty) {
         await currentUser!.updatePassword(_passwordController.text.trim());
       }
@@ -342,20 +353,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                               ),
-                              child: CircleAvatar(
-                                radius: 50,
-                                backgroundColor: Colors.grey[300],
-                                backgroundImage: _photoUrl != null
-                                    ? NetworkImage(_photoUrl!)
-                                    : null,
-                                child: _photoUrl == null
-                                    ? const Icon(
-                                        Icons.person,
-                                        color: Colors.grey,
-                                        size: 50,
-                                      )
-                                    : null,
-                              ),
+                              child: _isLoading 
+                                  ? const SizedBox(
+                                      width: 100, 
+                                      height: 100, 
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : CircleAvatar(
+                                      radius: 50,
+                                      backgroundColor: Colors.grey[300],
+                                      backgroundImage: _photoUrl != null
+                                          ? NetworkImage(_photoUrl!)
+                                          : null,
+                                      child: _photoUrl == null
+                                          ? const Icon(
+                                              Icons.person,
+                                              color: Colors.grey,
+                                              size: 50,
+                                            )
+                                          : null,
+                                    ),
                             ),
                             Positioned(
                               bottom: 0,

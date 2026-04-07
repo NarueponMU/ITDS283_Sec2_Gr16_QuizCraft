@@ -15,6 +15,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_cached_pdfview: ^0.4.3
+  http: ^1.6.0
   image_picker: ^1.2.1
   intl: ^0.20.2
   shake: ^3.0.0
