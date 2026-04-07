@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth เข้ามา
+import 'package:firebase_auth/firebase_auth.dart';
 import 'sign_up_page.dart';
-import '../../../main/presentation/pages/main_screen.dart'; // เช็ค Path ตรงนี้ให้ตรงกับของคุณด้วยนะครับ
+import '../../../main/presentation/pages/main_screen.dart';
 
-// 1. เปลี่ยนจาก StatelessWidget เป็น StatefulWidget เพื่อให้ปุ่มมีสถานะโหลดหมุนๆ ได้
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
 
@@ -12,15 +11,13 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
-  // 2. สร้าง Controller เพื่อรับค่าจากช่องกรอก
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  bool _isLoading = false; // ตัวแปรสำหรับเช็คว่ากำลังโหลดคุยกับ Firebase อยู่ไหม
+  bool _isLoading = false; 
+  bool _isObscure = true; // เพิ่มตัวแปรสำหรับเช็คการซ่อน/แสดงรหัสผ่าน
 
-  // 3. ฟังก์ชันสำหรับเข้าสู่ระบบ
   Future<void> _loginAccount() async {
-    // ป้องกันคนกดปุ่มรัวๆ โดยที่ยังไม่ได้พิมพ์อะไร
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter your email address and password completely.',
@@ -34,17 +31,15 @@ class _SignInPageState extends State<SignInPage> {
     }
 
     setState(() {
-      _isLoading = true; // เริ่มแสดงตัวโหลด
+      _isLoading = true; 
     });
 
     try {
-      // 3.1 ส่งอีเมลและรหัสผ่านไปเช็คกับ Firebase
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // 3.2 ถ้ารหัสผ่านถูก จะรันมาถึงบรรทัดนี้ ให้เด้งไปหน้า MainScreen ทันที
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -53,9 +48,7 @@ class _SignInPageState extends State<SignInPage> {
       }
 
     } on FirebaseAuthException catch (e) {
-      // ดักจับ Error กรณีอีเมลผิดหรือรหัสผิด แล้วบอกผู้ใช้เป็นภาษาไทย
       String message = 'An error occurred. Please try again.';
-      // ข้อสังเกต: Firebase รุ่นใหม่ๆ มักจะรวม Error อีเมลผิด/รหัสผิด เป็น 'invalid-credential' เพื่อความปลอดภัยจากการเดารหัส
       if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
         message = 'The email address or password is incorrect.';
       } else if (e.code == 'invalid-email') {
@@ -68,7 +61,6 @@ class _SignInPageState extends State<SignInPage> {
         );
       }
     } finally {
-      // ไม่ว่าจะสำเร็จหรือพัง ก็ต้องสั่งให้หยุดหมุนโหลด
       if (mounted) {
         setState(() {
           _isLoading = false; 
@@ -79,7 +71,6 @@ class _SignInPageState extends State<SignInPage> {
 
   @override
   void dispose() {
-    // ทำลายทิ้งเพื่อคืนหน่วยความจำเมื่อปิดหน้าจอ
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -87,7 +78,8 @@ class _SignInPageState extends State<SignInPage> {
 
   @override
   Widget build(BuildContext context) {
-    final Color bgColor = const Color.fromRGBO(0, 0, 138, 80);
+    // แก้ไขค่าสีให้ถูกต้อง (1.0 คือทึบ 100%) และใช้สี Hex ให้เชื่อมกับธีมหน้า Loading
+    final Color bgColor = const Color(0xFF003E99);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -136,7 +128,6 @@ class _SignInPageState extends State<SignInPage> {
                 ],
               ),
               const SizedBox(height: 40),
-              // ช่องกรอกข้อมูล
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -146,7 +137,7 @@ class _SignInPageState extends State<SignInPage> {
                 child: Column(
                   children: [
                     TextField(
-                      controller: _emailController, // ผูก Controller รับอีเมล
+                      controller: _emailController, 
                       keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
                         prefixIcon: Icon(Icons.email_outlined),
@@ -156,12 +147,24 @@ class _SignInPageState extends State<SignInPage> {
                     ),
                     const Divider(),
                     TextField(
-                      controller: _passwordController, // ผูก Controller รับรหัสผ่าน
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.lock_outline),
+                      controller: _passwordController, 
+                      obscureText: _isObscure, // 🌟 ใช้ตัวแปรควบคุมแทนคำว่า true
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.lock_outline),
                         hintText: 'Password',
                         border: InputBorder.none,
+                        // 🌟 เพิ่มปุ่มรูปตาสำหรับ เปิด-ปิด การมองเห็นรหัสผ่าน
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _isObscure ? Icons.visibility_off : Icons.visibility,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isObscure = !_isObscure; // สลับสถานะ
+                            });
+                          },
+                        ),
                       ),
                     ),
                   ],
@@ -171,7 +174,6 @@ class _SignInPageState extends State<SignInPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  // ถ้ากำลังโหลดอยู่ ให้ล็อกปุ่มไว้ (null)
                   onPressed: _isLoading ? null : _loginAccount, 
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blueAccent,
@@ -180,7 +182,6 @@ class _SignInPageState extends State<SignInPage> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  // ถ้าโหลดอยู่ ให้โชว์ไอคอนหมุนๆ แทนข้อความ Log in
                   child: _isLoading 
                       ? const SizedBox(
                           height: 20,

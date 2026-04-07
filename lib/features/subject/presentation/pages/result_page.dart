@@ -8,7 +8,7 @@ class ResultPage extends StatefulWidget {
   final int totalQuestions;
   final String subjectId;
   final String setId;
-  final int timeSpent; // 🌟 รับเวลาที่ใช้ทำข้อสอบมาจากหน้า Quiz
+  final int timeSpent; 
 
   const ResultPage({
     super.key,
@@ -16,7 +16,7 @@ class ResultPage extends StatefulWidget {
     required this.totalQuestions,
     required this.subjectId,
     required this.setId,
-    required this.timeSpent, // 🌟 เพิ่มมารับค่า
+    required this.timeSpent, 
   });
 
   @override
@@ -33,53 +33,48 @@ class _ResultPageState extends State<ResultPage> {
     _saveAndFetchBestScore();
   }
 
-  // แปลงวินาทีเป็น MM:SS สำหรับแสดงผล
   String _formatTime(int seconds) {
     int minutes = seconds ~/ 60;
     int remainingSeconds = seconds % 60;
-    String minsStr = minutes.toString().padLeft(2, '0');
-    String secsStr = remainingSeconds.toString().padLeft(2, '0');
-    return "$minsStr:$secsStr";
+    return "${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}";
   }
 
   Future<void> _saveAndFetchBestScore() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    
+    // ถ้าไม่มี User ต้องปิด Loading ด้วย ไม่ครั้นจะค้าง
+    if (user == null) {
+      if (mounted) setState(() => isLoading = false);
+      return;
+    }
 
     try {
-      // 🌟 1. บันทึกประวัติการทำข้อสอบ (เพิ่มเวลาที่ใช้เข้าไปด้วย!)
-      final historyRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('history') 
-          .doc(); 
+      final firestore = FirebaseFirestore.instance;
+      final userDoc = firestore.collection('users').doc(user.uid);
 
-      await historyRef.set({
+      // 1. บันทึก History (ใช้ Batch หรือ Write แยกก็ได้)
+      await userDoc.collection('history').add({
         'subjectId': widget.subjectId,
         'setId': widget.setId,
         'score': widget.score,
         'totalQuestions': widget.totalQuestions,
-        'timeSpent': widget.timeSpent, // 🔴 บันทึกวินาทีที่ใช้ ลง Firebase
+        'timeSpent': widget.timeSpent,
         'timestamp': FieldValue.serverTimestamp(), 
       });
 
-      // 🌟 2. อัปเดต Best Score ของชุดข้อสอบนี้
-      final docRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('scores')
-          .doc('${widget.subjectId}_${widget.setId}');
-
-      final docSnap = await docRef.get();
+      // 2. จัดการ Best Score
+      final scoreDocRef = userDoc.collection('scores').doc('${widget.subjectId}_${widget.setId}');
+      final docSnap = await scoreDocRef.get();
+      
       int currentBest = 0;
-
       if (docSnap.exists) {
         currentBest = docSnap.data()?['bestScore'] ?? 0;
       }
 
+      // ถ้าได้คะแนนใหม่ดีกว่าเดิม ให้อัปเดต
       if (widget.score > currentBest) {
         currentBest = widget.score;
-        await docRef.set({
+        await scoreDocRef.set({
           'bestScore': currentBest,
           'lastUpdated': FieldValue.serverTimestamp()
         }, SetOptions(merge: true));
@@ -92,12 +87,14 @@ class _ResultPageState extends State<ResultPage> {
         });
       }
     } catch (e) {
+      debugPrint("Error saving result: $e");
       if (mounted) setState(() => isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // คำนวณเปอร์เซ็นต์: (score / total) * 100
     double percentage = widget.totalQuestions == 0 ? 0 : (widget.score / widget.totalQuestions) * 100;
     bool isPassed = percentage >= 50;
 
@@ -114,100 +111,80 @@ class _ResultPageState extends State<ResultPage> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
-          title: const Text("Quiz Complete", style: TextStyle(color: Colors.white, fontFamily: 'SF-Pro')),
+          automaticallyImplyLeading: false, // ปิดปุ่ม Back อัตโนมัติ เพื่อบังคับให้ใช้ปุ่มเรา
+          title: const Text("Quiz Complete", style: TextStyle(color: Colors.white, fontFamily: 'SF-Pro', fontWeight: FontWeight.bold)),
+          centerTitle: true,
         ),
         body: SafeArea(
           child: isLoading
               ? const Center(child: CircularProgressIndicator(color: Colors.white))
-              : Padding(
-                  padding: const EdgeInsets.all(16),
+              : SingleChildScrollView( // ป้องกันจอเล็กแล้วล้น (Overflow)
+                  padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      const SizedBox(height: 20),
-                      Icon(
-                        isPassed ? Icons.star : Icons.sentiment_dissatisfied,
-                        size: 80,
-                        color: isPassed ? Colors.amberAccent : Colors.redAccent,
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        isPassed ? "Congratulations!" : "Keep Trying!",
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'SF-Pro'),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        isPassed 
-                            ? "You have successfully completed the quiz."
-                            : "Don't give up! Review the course and try again.",
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70, fontSize: 16, fontFamily: 'SF-Pro'),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // SCORE CARD
+                      const SizedBox(height: 10),
+                      // ไอคอนแสดงสถานะ
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isPassed ? Icons.emoji_events : Icons.sentiment_very_dissatisfied,
+                          size: 100,
+                          color: isPassed ? Colors.amber : Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      
+                      Text(
+                        isPassed ? "Great Job!" : "Keep it up!",
+                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'SF-Pro'),
+                      ),
+                      const SizedBox(height: 30),
+
+                      // SCORE CARD
+                      Container(
+                        padding: const EdgeInsets.all(25),
+                        decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20)],
                         ),
                         child: Column(
                           children: [
                             Text(
-                              "Score: ${widget.score} / ${widget.totalQuestions}",
-                              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro'),
+                              "${(percentage).toInt()}%",
+                              style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: isPassed ? Colors.green : Colors.redAccent, fontFamily: 'SF-Pro'),
                             ),
-                            const SizedBox(height: 12),
-                            
-                            _RowItem("Correct Answers", "${widget.score}"),
-                            _RowItem("Incorrect Answers", "${widget.totalQuestions - widget.score}"),
-                            
-                            // 🌟 แสดงเวลาที่ใช้จริง
-                            _RowItem("Time Used", _formatTime(widget.timeSpent)), 
-                            
-                            _RowItem("Best Score", "$bestScore/${widget.totalQuestions}"),
+                            const Divider(height: 40),
+                            _RowItem("Your Score", "${widget.score} / ${widget.totalQuestions}"),
+                            _RowItem("Time Spent", _formatTime(widget.timeSpent)),
+                            _RowItem("Best Score", "$bestScore / ${widget.totalQuestions}"),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 40),
 
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A2A66),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          ),
-                          onPressed: () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (_) => QuizPage(
-                                subjectId: widget.subjectId,
-                                setId: widget.setId,
-                              )),
-                            );
-                          },
-                          child: const Text("Retry Quiz", style: TextStyle(fontSize: 17, fontFamily: 'SF-Pro')),
-                        ),
+                      // ปุ่มกด
+                      _buildButton(
+                        label: "Retry Quiz",
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (_) => QuizPage(subjectId: widget.subjectId, setId: widget.setId)),
+                          );
+                        },
+                        color: const Color(0xFFFFB03A),
+                        textColor: Colors.black,
                       ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A2A66),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
-                          child: const Text("Back to Course", style: TextStyle(fontSize: 17, fontFamily: 'SF-Pro')),
-                        ),
+                      const SizedBox(height: 16),
+                      _buildButton(
+                        label: "Back to Home",
+                        onPressed: () => Navigator.pop(context),
+                        color: Colors.white.withOpacity(0.2),
+                        textColor: Colors.white,
                       ),
                     ],
                   ),
@@ -216,23 +193,32 @@ class _ResultPageState extends State<ResultPage> {
       ),
     );
   }
-}
 
-class _RowItem extends StatelessWidget {
-  final String title;
-  final String value;
+  Widget _buildButton({required String label, required VoidCallback onPressed, required Color color, required Color textColor}) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: textColor,
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          elevation: 0,
+        ),
+        onPressed: onPressed,
+        child: Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
+      ),
+    );
+  }
 
-  const _RowItem(this.title, this.value);
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _RowItem(String title, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(color: Colors.black54, fontSize: 15, fontFamily: 'SF-Pro')),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'SF-Pro')),
+          Text(title, style: const TextStyle(color: Colors.black54, fontSize: 16, fontFamily: 'SF-Pro', fontWeight: FontWeight.w500)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, fontFamily: 'SF-Pro', color: Colors.black)),
         ],
       ),
     );

@@ -105,7 +105,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         throw Exception('Failed to upload image');
       }
     } catch (e) {
-      print('🚨 ImgBB Error: $e');
+      print('ImgBB Error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

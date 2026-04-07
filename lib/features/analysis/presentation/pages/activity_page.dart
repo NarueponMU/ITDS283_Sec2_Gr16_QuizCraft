@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart'; // ใช้จัดการและจัดรูปแบบวันที่
+import 'package:intl/intl.dart';
 
 class ActivityPage extends StatefulWidget {
   const ActivityPage({super.key});
@@ -14,18 +14,16 @@ class _ActivityPageState extends State<ActivityPage> {
   String _selectedTime = 'This Week';
   final List<String> _timeOptions = ['This Week', 'This Month', 'This Year'];
 
-  // ตัวแปรเก็บข้อมูลสถิติที่คำนวณแล้ว
   int _totalQuizzes = 0;
-  Map<String, int> _chartData = {}; // เก็บข้อมูลวาดกราฟ เช่น {'Mon': 2, 'Tue': 0}
+  Map<String, int> _chartData = {};
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchActivityData(); // ดึงข้อมูลทันทีที่เปิดหน้า
+    _fetchActivityData();
   }
 
-  // 🔴 1. ฟังก์ชันดึงและประมวลผลข้อมูลจาก Firebase
   Future<void> _fetchActivityData() async {
     setState(() => _isLoading = true);
     
@@ -46,9 +44,7 @@ class _ActivityPageState extends State<ActivityPage> {
       int totalCount = 0;
       Map<String, int> tempChartData = {};
 
-      // เตรียมโครงสร้างกราฟเปล่าๆ ตาม Time Range ที่เลือก
       if (_selectedTime == 'This Week') {
-        // สร้างโครง Sun - Sat (7 วันย้อนหลัง)
         for (int i = 6; i >= 0; i--) {
           String day = DateFormat('EEE').format(now.subtract(Duration(days: i)));
           tempChartData[day] = 0;
@@ -59,16 +55,15 @@ class _ActivityPageState extends State<ActivityPage> {
         tempChartData = {'Q1': 0, 'Q2': 0, 'Q3': 0, 'Q4': 0};
       }
 
-      // วนลูปอ่านประวัติแต่ละก้อน
       for (var doc in historySnap.docs) {
         var data = doc.data();
-        if (data['timestamp'] == null) continue;
+        
+        // ป้องกันแอปพังถ้าข้อมูลใน Database ไม่ใช่ Timestamp
+        if (data['timestamp'] == null || data['timestamp'] is! Timestamp) continue;
         
         DateTime recordDate = (data['timestamp'] as Timestamp).toDate();
 
-        // 🔴 กรองข้อมูลและจัดลงกราฟตามช่วงเวลาที่เลือก
         if (_selectedTime == 'This Week') {
-          // เช็คว่าอยู่ใน 7 วันที่ผ่านมาหรือไม่
           if (now.difference(recordDate).inDays <= 6) {
             totalCount++;
             String dayLabel = DateFormat('EEE').format(recordDate);
@@ -77,7 +72,6 @@ class _ActivityPageState extends State<ActivityPage> {
             }
           }
         } else if (_selectedTime == 'This Month') {
-          // เช็คว่าอยู่เดือนเดียวกันและปีเดียวกัน
           if (recordDate.month == now.month && recordDate.year == now.year) {
             totalCount++;
             int day = recordDate.day;
@@ -87,7 +81,6 @@ class _ActivityPageState extends State<ActivityPage> {
             else tempChartData['W4'] = tempChartData['W4']! + 1;
           }
         } else if (_selectedTime == 'This Year') {
-          // เช็คว่าอยู่ปีเดียวกัน
           if (recordDate.year == now.year) {
             totalCount++;
             int month = recordDate.month;
@@ -99,7 +92,6 @@ class _ActivityPageState extends State<ActivityPage> {
         }
       }
 
-      // อัปเดต UI
       if (mounted) {
         setState(() {
           _totalQuizzes = totalCount;
@@ -112,7 +104,6 @@ class _ActivityPageState extends State<ActivityPage> {
     }
   }
 
-  // เปลี่ยนชื่อหัวข้อกราฟ
   String _getChartTitle() {
     switch (_selectedTime) {
       case 'This Month': return 'Monthly Activity';
@@ -122,17 +113,11 @@ class _ActivityPageState extends State<ActivityPage> {
     }
   }
 
-  // 🔴 2. ฟังก์ชันวาดกราฟจากข้อมูลจริง
   Widget _buildDynamicChart() {
     List<Widget> bars = [];
-    
-    // หาค่าสูงสุดเพื่อเอามาเทียบสัดส่วนกราฟ (กันกราฟทะลุกรอบ)
-    int maxValue = _chartData.values.isEmpty ? 1 : _chartData.values.reduce((a, b) => a > b ? a : b);
-    if (maxValue == 0) maxValue = 1; // ป้องกันหารด้วย 0
+    int maxValue = _getMaxValue(); 
 
-    // วาดแท่งกราฟทีละแท่งจากข้อมูลจริง
     _chartData.forEach((label, count) {
-      // คำนวณความสูง (สัดส่วนจาก 0.0 - 1.0)
       double heightRatio = count / maxValue;
       bars.add(_buildBarGroup(label, heightRatio, count)); 
     });
@@ -147,7 +132,7 @@ class _ActivityPageState extends State<ActivityPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent, // ให้โปร่งใสเพื่อโชว์ Gradient ด้านล่าง
+      backgroundColor: Colors.transparent,
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -167,8 +152,6 @@ class _ActivityPageState extends State<ActivityPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 20),
-                    
-                    // 1. Header (แก้ไขให้กลับมาใช้โครงสร้างเดิมของคุณ)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -187,12 +170,11 @@ class _ActivityPageState extends State<ActivityPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(width: 24), // บาลานซ์ปุ่ม Back
+                        const SizedBox(width: 24),
                       ],
                     ),
                     const SizedBox(height: 24),
 
-                    // 2. Dropdown
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -209,8 +191,9 @@ class _ActivityPageState extends State<ActivityPage> {
                               if (newValue != null && newValue != _selectedTime) {
                                 setState(() {
                                   _selectedTime = newValue;
+                                  _isLoading = true; // ให้มีวงกลมโหลดรอตอนเปลี่ยนแท็บ
                                 });
-                                _fetchActivityData(); // 🔴 ดึงข้อมูลใหม่เมื่อเปลี่ยน Time Range
+                                _fetchActivityData();
                               }
                             },
                             items: _timeOptions.map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(),
@@ -220,17 +203,15 @@ class _ActivityPageState extends State<ActivityPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 3. Stat Cards (ใช้ข้อมูลจริง)
                     Row(
                       children: [
                         Expanded(child: _buildStatCard(title: 'Total Quizzes\nTaken', value: '$_totalQuizzes', unit: '', titleColor: Colors.redAccent)),
                         const SizedBox(width: 16),
-                        Expanded(child: _buildStatCard(title: 'Total Time\nSpent', value: '-', unit: ' Hr', titleColor: Colors.lightBlue)), // เวลาใส่ - ไว้ก่อน
+                        Expanded(child: _buildStatCard(title: 'Total Time\nSpent', value: '-', unit: ' Hr', titleColor: Colors.lightBlue)),
                       ],
                     ),
                     const SizedBox(height: 16),
 
-                    // 4. Streak Card (จำลองไว้ก่อน)
                     Row(
                       children: [
                         Expanded(child: _buildStatCard(title: 'Streak', value: '1', unit: ' Day', titleColor: const Color(0xFFFF9500))),
@@ -240,7 +221,6 @@ class _ActivityPageState extends State<ActivityPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // 5. Dynamic Chart Area (ใช้ข้อมูลจริง)
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(color: const Color(0xFFF2F5F8), borderRadius: BorderRadius.circular(24)),
@@ -253,7 +233,6 @@ class _ActivityPageState extends State<ActivityPage> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                // แกน Y แบบอัตโนมัติตามค่าสูงสุด
                                 Column(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -282,11 +261,11 @@ class _ActivityPageState extends State<ActivityPage> {
     );
   }
 
-  // ตัวช่วยหาค่าสูงสุดแกน Y
+  // บังคับเพดานขั้นต่ำไว้ที่ 4 เพื่อไม่ให้แกน Y โชว์เลข 0 ซ้ำๆ กันถ้าคนใช้น้อย
   int _getMaxValue() {
-    if (_chartData.isEmpty) return 10;
+    if (_chartData.isEmpty) return 4;
     int max = _chartData.values.reduce((a, b) => a > b ? a : b);
-    return max == 0 ? 10 : max;
+    return max < 4 ? 4 : max;
   }
 
   Widget _yAxisLabel(String text) {
@@ -319,25 +298,24 @@ class _ActivityPageState extends State<ActivityPage> {
     );
   }
 
-  // 🔴 ปรับแท่งกราฟให้แสดง 1 แท่งต่อ 1 ค่า (เพราะเราไม่ได้แยกประเภท Quiz ย่อยๆ ในหน้า Activity)
+  // ปรับกราฟให้ถ้าค่าเป็น 0 จะแบนติดพื้นและเป็นสีเทาบางๆ ไม่หลอกตาผู้ใช้
   Widget _buildBarGroup(String label, double heightRatio, int realCount) {
-    // ป้องกันกราฟเตี้ยเกินไปจนมองไม่เห็น
-    double finalHeight = heightRatio > 0 ? heightRatio : 0.05;
+    double finalHeight = heightRatio;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        // แสดงตัวเลขไว้บนกราฟถ้ามีค่า
         if (realCount > 0)
            Text('$realCount', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87)),
         const SizedBox(height: 4),
         Container(
-          width: 12, // เพิ่มขนาดความกว้างกราฟนิดนึง
-          height: 150 * finalHeight,
+          width: 12,
+          height: finalHeight > 0 ? (150 * finalHeight) : 2, 
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(4),
-            // เปลี่ยนสีเป็นโทนเขียวตามดีไซน์หลัก
-            gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF55E37D), Color(0xFF1E8F43)]),
+            gradient: finalHeight > 0 
+                ? const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF55E37D), Color(0xFF1E8F43)])
+                : const LinearGradient(colors: [Colors.black12, Colors.black12]), 
           ),
         ),
         const SizedBox(height: 8),

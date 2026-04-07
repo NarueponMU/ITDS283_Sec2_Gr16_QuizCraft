@@ -11,15 +11,14 @@ class SubjectPage extends StatefulWidget {
 
 class _SubjectPageState extends State<SubjectPage> {
   String _searchQuery = "";
-  late Stream<QuerySnapshot> _subjectStream;
-  
-  // 🔴 เพิ่ม Controller เพื่อเอาไว้กดปุ่ม X เคลียร์ข้อความได้
   final TextEditingController _searchController = TextEditingController();
+  late Stream<QuerySnapshot> _subjectStream;
 
   @override
   void initState() {
     super.initState();
-    _subjectStream = FirebaseFirestore.instance.collection('subjects').snapshots();
+    // ดึงข้อมูลวิชาเรียงตามรหัสวิชาเพื่อให้ดูเป็นระเบียบ
+    _subjectStream = FirebaseFirestore.instance.collection('subjects').orderBy('code').snapshots();
   }
 
   @override
@@ -29,130 +28,100 @@ class _SubjectPageState extends State<SubjectPage> {
   }
 
   IconData _getIcon(String code) {
-    switch (code) {
-      case "ITDS120": return Icons.computer;
-      case "ITDS124": return Icons.functions;
-      case "ITDS191": return Icons.balance; 
-      case "ITDS231": return Icons.wifi;
-      case "ITDS261": return Icons.developer_mode;
-      case "ITDS271": return Icons.security;
-      default: return Icons.book;
-    }
+    if (code.contains('DS271')) return Icons.security;
+    if (code.contains('DS231')) return Icons.wifi;
+    if (code.contains('DS261')) return Icons.developer_mode;
+    if (code.contains('DS124')) return Icons.functions;
+    if (code.contains('DS120')) return Icons.computer;
+    return Icons.menu_book_rounded;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF003E99), Color(0xFF0053CC), Color(0xFF227CFF)],
-          ),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF003E99), Color(0xFF0053CC), Color(0xFF227CFF)],
         ),
-        child: SafeArea(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _subjectStream, 
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: Colors.white));
-              }
-              if (snapshot.hasError) {
-                return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล', style: TextStyle(color: Colors.white, fontFamily: 'SF-Pro')));
-              }
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const Center(child: Text('ไม่พบรายวิชา', style: TextStyle(color: Colors.white, fontSize: 18, fontFamily: 'SF-Pro')));
-              }
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(24, 20, 24, 10),
+                child: Text('Subject', style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
+              ),
 
-              final allSubjects = snapshot.data!.docs;
-
-              // กรองข้อมูลการ์ดวิชาตามคำที่พิมพ์
-              final filteredSubjects = allSubjects.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final name = (data['name'] ?? '').toString().toLowerCase();
-                final code = (data['code'] ?? '').toString().toLowerCase();
-                final fullName = '$code $name'; 
-                
-                return fullName.contains(_searchQuery);
-              }).toList();
-
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Subject', style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
-                    const SizedBox(height: 24),
-
-                    // 🔴 SEARCH BAR: เปลี่ยนเป็นกล่องเดี่ยวๆ แบบคลีนๆ ไม่มี Dropdown
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))], 
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value.toLowerCase(); 
-                          });
-                        },
-                        style: const TextStyle(fontFamily: 'SF-Pro', color: Colors.black87, fontSize: 16),
-                        decoration: InputDecoration(
-                          hintText: 'Search Course...',
-                          hintStyle: const TextStyle(color: Colors.grey, fontFamily: 'SF-Pro'),
-                          prefixIcon: const Icon(Icons.search, color: Colors.black54),
-                          // 🔴 ถ้ามีการพิมพ์ข้อความ ให้โชว์ปุ่ม X สำหรับเคลียร์
-                          suffixIcon: _searchQuery.isNotEmpty 
-                              ? IconButton(
-                                  icon: const Icon(Icons.cancel, color: Colors.grey),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() {
-                                      _searchQuery = ""; // รีเซ็ตคำค้นหา
-                                    });
-                                  },
-                                )
-                              : null,
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                        ),
-                      ),
+              // Search Bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))], 
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() => _searchQuery = value.toLowerCase()),
+                    style: const TextStyle(fontFamily: 'SF-Pro', color: Colors.black87),
+                    decoration: InputDecoration(
+                      hintText: 'Search Course...',
+                      prefixIcon: const Icon(Icons.search, color: Colors.black54),
+                      suffixIcon: _searchQuery.isNotEmpty 
+                          ? IconButton(icon: const Icon(Icons.cancel, color: Colors.grey), onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = "");
+                            })
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // 🔴 ส่วนแสดงการ์ดวิชา (จะกรองและเด้งดึ๋งๆ ตามที่เราพิมพ์เป๊ะๆ)
-                    Expanded(
-                      child: filteredSubjects.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No subjects found.', 
-                                style: TextStyle(color: Colors.white70, fontSize: 16, fontFamily: 'SF-Pro')
-                              )
-                            )
-                          : ListView.builder(
-                              itemCount: filteredSubjects.length,
-                              itemBuilder: (context, index) {
-                                var subjectData = filteredSubjects[index].data() as Map<String, dynamic>;
-                                String id = filteredSubjects[index].id;
-                                String code = subjectData['code'] ?? '';
-                                String name = subjectData['name'] ?? 'Unknown Subject';
-                                String difficulty = subjectData['difficulty'] ?? 'Medium';
-
-                                return _subjectItem(context, id, code, name, difficulty);
-                              },
-                            ),
-                    ),
-                  ],
+                  ),
                 ),
-              );
-            },
+              ),
+
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _subjectStream, 
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: Colors.white));
+                    }
+
+                    final subjects = snapshot.data?.docs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final fullName = '${data['code']} ${data['name']}'.toLowerCase();
+                      return fullName.contains(_searchQuery);
+                    }).toList() ?? [];
+
+                    if (subjects.isEmpty) {
+                      return const Center(child: Text('No subjects found.', style: TextStyle(color: Colors.white70, fontSize: 16, fontFamily: 'SF-Pro')));
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      itemCount: subjects.length,
+                      itemBuilder: (context, index) {
+                        var data = subjects[index].data() as Map<String, dynamic>;
+                        return _subjectItem(
+                          context, 
+                          subjects[index].id, 
+                          data['code'] ?? '', 
+                          data['name'] ?? 'Unknown', 
+                          data['difficulty'] ?? 'Medium'
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -160,59 +129,42 @@ class _SubjectPageState extends State<SubjectPage> {
   }
 
   Widget _subjectItem(BuildContext context, String id, String code, String name, String difficulty) {
-    Color diffColor;
-    if (difficulty == 'Hard') {
-      diffColor = Colors.red;
-    } else if (difficulty == 'Medium') {
-      diffColor = Colors.orange;
-    } else {
-      diffColor = Colors.green;
-    }
+    Color diffColor = difficulty == 'Hard' ? Colors.red : (difficulty == 'Medium' ? Colors.orange : Colors.green);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SubjectDetailPage(subjectId: id, title: name), 
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Material( // 🔴 1. ใช้ Material ครอบเพื่อให้ InkWell แสดงผลรอยกดได้
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        elevation: 4,
+        shadowColor: Colors.black26,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SubjectDetailPage(subjectId: id, title: name))),
+          child: Padding( // 🔴 2. ใช้ Padding แทน Container Margin เพื่อให้รอยกดเต็มพื้นที่การ์ด
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: const Color(0xFFF0F4F8), borderRadius: BorderRadius.circular(15)),
+                  child: Icon(_getIcon(code), size: 28, color: const Color(0xFF003E99)),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro'), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      Text(difficulty, style: TextStyle(color: diffColor, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'SF-Pro')),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded, size: 18, color: Colors.black26),
+              ],
+            ),
           ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white, 
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 6)),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
-              child: Icon(_getIcon(code), size: 30, color: Colors.black),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro'), maxLines: 2, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 6),
-                  Text(difficulty, style: TextStyle(color: diffColor, fontWeight: FontWeight.bold, fontFamily: 'SF-Pro')),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: Colors.grey.shade300, shape: BoxShape.circle),
-              child: const Icon(Icons.arrow_forward),
-            ),
-          ],
         ),
       ),
     );
