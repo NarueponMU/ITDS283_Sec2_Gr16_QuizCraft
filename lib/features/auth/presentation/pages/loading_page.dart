@@ -17,30 +17,20 @@ class _LoadingPageState extends State<LoadingPage> {
     _checkLoginStatus(); // เรียกฟังก์ชันตรวจสอบตอนเปิดหน้านี้ขึ้นมา
   }
 
-  // ฟังก์ชันหน่วงเวลา 2 วินาที แล้วเช็คสถานะล็อกอิน
   Future<void> _checkLoginStatus() async {
-    // 1. รอ 2 วินาทีเพื่อให้โชว์หน้า Splash Screen สวยๆ
-    await Future.delayed(const Duration(seconds: 2));
+    // 1. รอ 3 วินาทีเพื่อให้โชว์หน้า Splash Screen สวยๆ
+    await Future.delayed(const Duration(seconds: 3));
 
-    // ป้องกัน Error กรณีที่หน้าจอถูกปิดไปก่อนที่เวลาจะครบ
     if (!mounted) return; 
 
-    // 2. เช็คว่ามีใครล็อกอินค้างไว้ไหม
-    User? currentUser = FirebaseAuth.instance.currentUser;
+    // 2. สั่งเคลียร์ Session เก่าทิ้งทันที (Refresh ใหม่)
+    await FirebaseAuth.instance.signOut();
 
-    if (currentUser != null) {
-      // ถ้ามีคนล็อกอินอยู่ ไปหน้า MainScreen
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainScreen()),
-      );
-    } else {
-      // ถ้าไม่มีคนล็อกอิน ไปหน้า SignInPage
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SignInPage()),
-      );
-    }
+    // 3. บังคับเด้งไปหน้า SignIn เสมอ! (ไม่ต้องเช็คว่าใครล็อกอินค้างไว้)
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const SignInPage()),
+    );
   }
 
   @override
