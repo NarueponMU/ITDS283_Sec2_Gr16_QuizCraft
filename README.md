@@ -18,6 +18,7 @@
   <img width="250" alt="Screen 1" src="https://github.com/user-attachments/assets/472c1263-ec56-4715-bee4-e3543ad91af5" />
   <img width="250" alt="Screen 2" src="https://github.com/user-attachments/assets/e73a977e-e76d-44aa-9c1c-feafdea4cf72" />
   <img width="250" alt="Screen 3" src="https://github.com/user-attachments/assets/7d2ba27e-a053-4729-a7f9-489e1bc626a3" />
+  <img width="250" height="1434" alt="IMG_7490" src="https://github.com/user-attachments/assets/83b05873-6f26-4bec-bbbc-0158866dc477" />
 </p>
 
 ## 🛠️ Technology Stack
