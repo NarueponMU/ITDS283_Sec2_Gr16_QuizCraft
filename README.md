@@ -15,9 +15,9 @@
 * **👤 จัดการโปรไฟล์ (Customizable Profiles):** ผู้ใช้สามารถอัปเดตข้อมูลส่วนตัวและอัปโหลดรูปโปรไฟล์ได้ (ผสานการทำงานร่วมกับ ImgBB API)
 * **🌗 UI/UX อัจฉริยะ (Smart UI):** ดีไซน์ทันสมัยแบบ Glassmorphism พร้อมฟีเจอร์ลับ "เขย่ามือถือเพื่อสลับโหมด Dark/Light" (ใช้เซนเซอร์ Accelerometer)
 <p align="center">
-  <img width="250" alt="Screen 1" src="https://github.com/user-attachments/assets/e73a977e-e76d-44aa-9c1c-feafdea4cf72" />
-  <img width="250" alt="Screen 2" src="https://github.com/user-attachments/assets/7d2ba27e-a053-4729-a7f9-489e1bc626a3" />
-  <img width="250" alt="Screen 3" src="https://github.com/user-attachments/assets/472c1263-ec56-4715-bee4-e3543ad91af5" />
+  <img width="250" alt="Screen 1" src="https://github.com/user-attachments/assets/472c1263-ec56-4715-bee4-e3543ad91af5" />
+  <img width="250" alt="Screen 2" src="https://github.com/user-attachments/assets/e73a977e-e76d-44aa-9c1c-feafdea4cf72" />
+  <img width="250" alt="Screen 3" src="https://github.com/user-attachments/assets/7d2ba27e-a053-4729-a7f9-489e1bc626a3" />
 </p>
 
 ## 🛠️ Technology Stack
